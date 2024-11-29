@@ -7,12 +7,16 @@ winButton.onclick = () =>
 {
     let rotateDegrees = Math.random()*360*3+360*3
     currentRotation += rotateDegrees
-    let transDuration = currentRotation/360
+    let transDuration = currentRotation/(Math.random()*360*2+360)
     wheel.style.transitionDuration = transDuration+"s"
     wheel.style.transform = "rotate("+currentRotation+"deg)"
     setTimeout(() => {
         let popupDuration = Math.random() * 6 + 1
         winPopup.style.animation = `ad-popup-anim ${popupDuration}s`
+        if (Math.random() < 0.1)
+        {
+            winPopup.style.animation = `ad-popup-anim-rev ${popupDuration}s`
+        }
         // winPopup.style.animationDuration = transDuration + "s"
         setTimeout(() => {
             winPopup.style.animation = ""
