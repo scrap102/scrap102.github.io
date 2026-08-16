@@ -184,7 +184,9 @@ const EXTRA_ITEMS = [
   {id:"quicksand", name:"Зыбучие пески", tags:"O", rarity:"normal", desc:"Засасывают противника прямо посреди боя."},
   {id:"pepper_spray", name:"Банка перечного спрея *", tags:"Y", rarity:"rare", desc:"Кактусовый экстракт под давлением. Работает на всех, включая своих."},
   {id:"last_breath_charm", name:"Оберег последнего вздоха *", tags:"Y", rarity:"precious", desc:"Не даёт умереть. Один раз. Дальше — сам как-нибудь."},
-  {id:"rabbit_foot", name:"Заячья лапка *", tags:"Y", rarity:"suchself", desc:"Технически — от таракана. Но работает точно так же, говорят."}
+  {id:"rabbit_foot", name:"Заячья лапка *", tags:"Y", rarity:"suchself", desc:"Технически — от таракана. Но работает точно так же, говорят."},
+  {id:"stasik_mushroom", name:"Гриб Стасика *", tags:"Y", rarity:"suchself", desc:"Происхождение не обсуждается. Действие — тоже, оно каждый раз разное."},
+  {id:"beadhandful", name:"Горсть бус *", tags:"X", rarity:"trash", desc:"Официальная валюта ВЦВП. Больше нигде не принимают, даже там."}
 ];
 for (const it of EXTRA_ITEMS) ITEM_DB[it.id] = it;
 
@@ -264,7 +266,7 @@ const UNIT_EMOJI = {
 const MOB_EMOJI = {
   mob_1:"🟤", mob_2:"💧", mob_3:"🔺", mob_4:"📏", mob_5:"〰️", mob_6:"👽",
   mob_7:"🍃", mob_8:"🛢️", mob_9:"♾️", mob_10:"📯", mob_11:"📐", mob_12:"🗡️",
-  mimic:"🎁", casino_enemy:"💀"
+  mimic:"🎁", casino_enemy:"💀", busik:"📿"
 };
 function getEmoji(unitId){
   return UNIT_EMOJI[unitId] || MOB_EMOJI[unitId] || "👤";
@@ -665,7 +667,511 @@ const DIOGEN_TRADES = [
   {id:"t6", give:{io:50}, get:{ar:5}, label:"50 Ио → 5 АР («не спрашивай, откуда курс»)", homebrew:true}
 ];
 
+// ===================== SEWER NARRATIVE EVENTS (Round 7) =====================
+// Random encounters that can replace a non-boss, non-flagged route node ~25% of the time. Each is a small
+// dialogue tree (same shape as NOTIF_TYPES); an option can trigger a real ad-hoc fight via `fight: [enemyDefs]`.
+// Per design: fights favor several weaker enemies over one strong one, for an interesting positioning
+// puzzle — a lone tough unit is reserved for bosses and the couple of explicitly "special" encounters below
+// (Таракан особого класса, Байкер-медведь).
+const SEWER_EVENTS = {
+  candy_army: { icon:"🍬", title:"Армия конфет", tree:{
+    start: { text:"Впереди в темноте маршируют ровные шеренги конфет в фольге. У них есть знамя. У знамени, кажется, есть глаза.",
+      options:[
+        {label:"⚔ Атаковать", fight:[{name:"Конфетный солдат *",hp:8,dmg:2,shld:0},{name:"Конфетный солдат *",hp:8,dmg:2,shld:0},{name:"Конфетный солдат *",hp:8,dmg:2,shld:0}]},
+        {label:"Договориться", effect:"candy_bribe", next:null},
+        {label:"Тихо обойти", effect:"candy_sneak", next:null}
+      ]}
+  }},
+  cockroach_special: { icon:"🪳", title:"Таракан особого класса", tree:{
+    start: { text:"На стене сидит таракан размером с ботинок. Рядом на кафеле нацарапано: «ОСОБЫЙ КЛАСС. НЕ ТРОГАТЬ».",
+      options:[
+        {label:"⚔ Всё равно тронуть", fight:[{name:"Таракан особого класса *",hp:70,dmg:6,shld:3}]},
+        {label:"Не трогать, как и написано", effect:"cockroach_peaceful", next:null}
+      ]}
+  }},
+  parity_cult: { icon:"🔢", title:"Секта Чётности", tree:{
+    start: { text:"Фигуры в капюшонах стоят строго парами и синхронно кивают. У них подчёркнуто чётное количество всего.",
+      options:[
+        {label:"Присоединиться к кивкам", next:"ritual"},
+        {label:"⚔ Разогнать", fight:[{name:"Служитель Чётности *",hp:9,dmg:2,shld:1},{name:"Служитель Чётности *",hp:9,dmg:2,shld:1}]},
+        {label:"Уйти", next:null, resultText:"Культисты синхронно кивают вслед — по два раза каждый."}
+      ]},
+    ritual: { text:"Один из культистов торжественно протягивает вам нечётное число. Это явно проверка на верность.",
+      options:[
+        {label:"Взять нечётное число (соврать)", effect:"parity_lie", next:null},
+        {label:"Отказаться", effect:"parity_honest", next:null}
+      ]}
+  }},
+  lost_auditor: { icon:"📋", title:"Заблудившийся аудитор", tree:{
+    start: { text:"Человек в мятом костюме светит фонариком в планшет и требует «документы на канализацию».",
+      options:[
+        {label:"Показать документы (блефовать)", effect:"auditor_show_docs", next:null},
+        {label:"Впарить фальшивку", effect:"auditor_fake_docs", next:null},
+        {label:"Бежать", next:null, resultText:"Аудитор безуспешно кричит вслед что-то про «форму 12-Б»."}
+      ]}
+  }},
+  rat_crown: { icon:"👑", title:"Драка крыс за корону", tree:{
+    start: { text:"Десяток крыс дерётся за корону из пивной пробки. Судя по накалу, ставки высоки.",
+      options:[
+        {label:"⚔ Встрять в драку", fight:[{name:"Крыса-претендентка *",hp:7,dmg:2,shld:0},{name:"Крыса-претендентка *",hp:7,dmg:2,shld:0},{name:"Крыса-претендентка *",hp:7,dmg:2,shld:0}]},
+        {label:"Поставить на фаворита", effect:"rat_bet", next:null},
+        {label:"Пройти мимо", next:null, resultText:"Корона переходит из лап в лапы ещё несколько раз, пока вы не скрываетесь из виду."}
+      ]}
+  }},
+  dimension_bubble: { icon:"🫧", title:"Пузырь из другого измерения", tree:{
+    start: { text:"У стены висит переливающийся пузырь. Внутри что-то происходит — что именно, лучше не всматриваться.",
+      options:[
+        {label:"Потрогать", effect:"bubble_touch", next:null},
+        {label:"Не трогать", next:null, resultText:"Пузырь укоризненно переливается, но остаётся нетронутым."}
+      ]}
+  }},
+  siren_pipes: { icon:"🎶", title:"Хор канализационных сирен", tree:{
+    start: { text:"Трубы над головой начинают петь — стройно, красиво и абсолютно не по-трубному.",
+      options:[
+        {label:"Слушать", effect:"siren_listen", next:null},
+        {label:"Заткнуть уши и идти", next:null, resultText:"Пение стихает вдали. Возможно, вы упустили что-то важное. Возможно, и нет."}
+      ]}
+  }},
+  dimension_bro: { icon:"🕶️", title:"Бро из соседнего измерения", tree:{
+    start: { text:"Из трещины в стене выглядывает чувак в солнцезащитных очках. «Йо, брат, ты вообще не из этого измерения, да?»",
+      options:[
+        {label:"Дать пять", effect:"bro_fist_bump", next:null},
+        {label:"Обменяться товаром", effect:"bro_trade", next:null},
+        {label:"Не обращать внимания", next:null, resultText:"«Как скажешь, брат», — чувак пожимает плечами и исчезает обратно в трещину."}
+      ]}
+  }},
+  gnome_crew: { icon:"⛏️", title:"Строительная бригада гномов", tree:{
+    start: { text:"Пятеро гномов в касках сверяются с чертежом, который явно нарисован вверх ногами.",
+      options:[
+        {label:"Помочь материалами (Камень ×3)", effect:"gnome_help", next:null},
+        {label:"Спросить, что строят", next:"explain"},
+        {label:"Идти дальше", next:null, resultText:"Гномы машут вслед, не отрываясь от чертежа."}
+      ]},
+    explain: { text:"Старший гном долго и с восторгом объясняет проект. Вы не понимаете ни слова, но кажется, это грандиозно.",
+      options:[
+        {label:"Впечатлиться", effect:"gnome_impressed", next:null}
+      ]}
+  }},
+  crying_faucet: { icon:"🚰", title:"Плачущий кран", tree:{
+    start: { text:"Из стены торчит одинокий кран и тихо, безутешно капает. Кажется, кран плачет.",
+      options:[
+        {label:"Утешить", effect:"faucet_comfort", next:null},
+        {label:"Игнорировать", next:null, resultText:"Кран продолжает капать вам вслед. Тоскливо."}
+      ]}
+  }},
+  mop_revolution: { icon:"🧹", title:"Швабра-революционерка", tree:{
+    start: { text:"Ожившая швабра толкает пламенную речь перед строем вёдер о свержении «Совета Вёдер».",
+      options:[
+        {label:"Расспросить подробнее", next:"recruit"},
+        {label:"⚔ Разогнать революцию", fight:[{name:"Швабра-боец *",hp:10,dmg:2,shld:1},{name:"Швабра-боец *",hp:10,dmg:2,shld:1},{name:"Вёдро-охранник *",hp:12,dmg:1,shld:2}]},
+        {label:"Уйти", next:null, resultText:"Швабра провожает вас взглядом ручки. Революция подождёт."}
+      ]},
+    recruit: { text:"Швабра предлагает присоединиться и лично свергнуть Совет Вёдер прямо сейчас.",
+      options:[
+        {label:"⚔ Помочь свергнуть", fight:[{name:"Швабра-боец *",hp:10,dmg:2,shld:1},{name:"Швабра-боец *",hp:10,dmg:2,shld:1},{name:"Вёдро-охранник *",hp:12,dmg:1,shld:2}]},
+        {label:"Передумать", next:null, resultText:"Швабра разочарованно обмякает у стены. Революция откладывается."}
+      ]}
+  }},
+  beer_fountain: { icon:"🍺", title:"Сломанный пивной фонтан", tree:{
+    start: { text:"Из треснувшей трубы бьёт тонкая струя пива. Кто-то уже оставил рядом кружку.",
+      options:[
+        {label:"Напоить случайного юнита", effect:"beer_random_unit", next:null},
+        {label:"Пройти мимо", next:null, resultText:"Струя пива тоскливо стекает в решётку, так никем и не оценённая."}
+      ]}
+  }},
+  mirror_clones: { icon:"🪞", title:"Толпа зеркальных двойников", tree:{
+    start: { text:"На стене — треснувшее зеркало в человеческий рост. Из трещин выбираются нечёткие, враждебные копии вашего отряда.",
+      options:[
+        {label:"⚔ Разбить зеркала", fight:[{name:"Зеркальный двойник *",hp:10,dmg:3,shld:0},{name:"Зеркальный двойник *",hp:10,dmg:3,shld:0},{name:"Зеркальный двойник *",hp:10,dmg:3,shld:0}]},
+        {label:"Всмотреться", effect:"mirror_gaze", next:null}
+      ]}
+  }},
+  tour_salesman: { icon:"🎫", title:"Продавец подземных экскурсий", tree:{
+    start: { text:"Мужчина с флажком и бейджиком «Гид» настаивает на «эксклюзивном обходе тайных троп».",
+      options:[
+        {label:"Купить экскурсию (20 Ио)", effect:"tour_buy", next:null},
+        {label:"Отказаться", next:null, resultText:"Гид пожимает плечами и уходит искать других туристов. Их тут явно немного."}
+      ]}
+  }},
+  arcade_machine: { icon:"🕹️", title:"Ретро-автомат с историями", tree:{
+    start: { text:"Древний игровой автомат мигает единственной надписью: «ВСТАВЬ МОНЕТУ, ЕСЛИ НЕ БОИШЬСЯ ИСТОРИЙ».",
+      options:[
+        {label:"Закинуть монетку (10 Ио)", effect:"arcade_coin", next:null},
+        {label:"Пнуть автомат", effect:"arcade_kick", next:null},
+        {label:"Пройти мимо", next:null, resultText:"Автомат обиженно гаснет за спиной."}
+      ]}
+  }},
+  sock_gang: { icon:"🧦", title:"Банда носков-беглецов", tree:{
+    start: { text:"Стая одиноких носков преграждает путь, требуя «дань за проход по стиральной территории».",
+      options:[
+        {label:"Отдать дань (Ткань ×2)", effect:"sock_tribute", next:null},
+        {label:"⚔ Дать отпор", fight:[{name:"Носок-голем *",hp:8,dmg:3,shld:0},{name:"Носок-голем *",hp:8,dmg:3,shld:0},{name:"Носок-голем *",hp:8,dmg:3,shld:0}]},
+        {label:"Договориться словами", effect:"sock_talk", next:null}
+      ]}
+  }},
+  fridge_oracle: { icon:"🧊", title:"Древний холодильник-оракул", tree:{
+    start: { text:"Ржавый холодильник гудит низким голосом: «ЗАДАЙ ВОПРОС ИЛИ ОТВЕТЬ НА МОЙ. ЧТО ГЛАВНОЕ ВО МНЕ?»",
+      options:[
+        {label:"«Дверь»", effect:"fridge_answer_door", next:null},
+        {label:"«Холод»", effect:"fridge_answer_cold", next:null},
+        {label:"Промолчать", effect:"fridge_silence", next:null}
+      ]}
+  }},
+  biker_bear: { icon:"🐻", title:"Дезориентированный медведь-байкер", tree:{
+    start: { text:"Посреди тоннеля стоит байк, а рядом — медведь в косухе, растерянно смотрящий на карту вверх ногами.",
+      options:[
+        {label:"⚔ Успокоить силой", fight:[{name:"Байкер-медведь *",hp:55,dmg:5,shld:2}]},
+        {label:"Подсказать дорогу", effect:"bear_directions", next:null}
+      ]}
+  }},
+  mimic_rally: { icon:"🎁", title:"Митинг мимиков", tree:{
+    start: { text:"Десяток сундуков стоят в кружок с плакатами «МИМИКИ ТОЖЕ ЛЮДИ» и «НЕ ВСЯКИЙ СУНДУК — ЛОВУШКА».",
+      options:[
+        {label:"Поддержать", effect:"mimic_support", next:null},
+        {label:"Разоблачить обман", effect:"mimic_expose", next:null},
+        {label:"Уйти", next:null, resultText:"Митинг продолжается без вас — сундуки уже спорят между собой."}
+      ]}
+  }},
+  treasure_ghost: { icon:"👻", title:"Призрак с картой сокровищ", tree:{
+    start: { text:"Полупрозрачная фигура держит подмышкой явно поддельную карту сокровищ и таинственно шепчет о «настоящем кладе».",
+      options:[
+        {label:"Купить карту (15 Ио)", effect:"ghost_map", next:null},
+        {label:"Отказаться", next:null, resultText:"Призрак разочарованно растворяется в стене вместе с картой."}
+      ]}
+  }}
+};
+
+function applySewerEventEffect(key){
+  switch(key){
+    case "candy_bribe": {
+      const cost=15;
+      if (!canAffordIo(cost)) return "У вас не хватает Ио на «переговоры». Конфеты сурово смотрят.";
+      spendIo(cost); addItem("candy",2);
+      return "Строй конфет расступается, вручив вам пару своих на память. Дипломатия работает!";
+    }
+    case "candy_sneak": {
+      if (Math.random()<0.6) return "Получилось прошмыгнуть незамеченным. Неловко, но эффективно.";
+      const loss=10+Math.floor(Math.random()*10); spendIo(loss);
+      return "Замечены. Конфетный интендант штрафует «за нарушение строя» на "+loss+" Ио.";
+    }
+    case "cockroach_peaceful": { const amt=10+Math.floor(Math.random()*10); player.io+=amt; return "Вы уважаете табличку и проходите мимо. Находите "+amt+" Ио, оброненных предыдущим смельчаком."; }
+    case "parity_lie": {
+      if (Math.random()<0.5){ addItem("medal",1); return "Культисты не замечают подвоха и в восторге вручают медаль за «верность чётности»."; }
+      const loss=10+Math.floor(Math.random()*15); spendIo(loss);
+      return "Культисты чуют нечётность в вашей душе и штрафуют на "+loss+" Ио «за дисбаланс».";
+    }
+    case "parity_honest": { player.io+=10; return "За честность культисты неохотно, но выдают 10 Ио «на удачу»."; }
+    case "auditor_show_docs": { const amt=12+Math.floor(Math.random()*10); player.io+=amt; return "Документов, конечно, нет — но аудитор так впечатлён вашей уверенностью, что выписывает «компенсацию за стресс», "+amt+" Ио."; }
+    case "auditor_fake_docs": {
+      if (Math.random()<0.5){ addItem("grime",3); return "Фальшивка проходит на ура. Аудитор доволен и оставляет немного черни в качестве «печати»."; }
+      const loss=8+Math.floor(Math.random()*12); spendIo(loss);
+      return "Аудитор раскусывает подделку и штрафует на "+loss+" Ио за «моральный урон бюрократии».";
+    }
+    case "rat_bet": {
+      if (Math.random()<0.45){ const amt=20+Math.floor(Math.random()*20); player.io+=amt; return "Ваш фаворит выигрывает корону! Получаете "+amt+" Ио с восторженных букмекеров-крыс."; }
+      const loss=10+Math.floor(Math.random()*10); spendIo(loss);
+      return "Фаворит эффектно проигрывает. Крысы-букмекеры забирают "+loss+" Ио.";
+    }
+    case "bubble_touch": {
+      const roll=Math.random();
+      if (roll<0.4){ addItem("madnessjar",1); return "Пузырь лопается и оставляет на полу банку «Безумия». Спасибо, наверное."; }
+      if (roll<0.75){ const amt=15+Math.floor(Math.random()*20); player.io+=amt; return "Пузырь на секунду показывает выигрышные числа. Находите "+amt+" Ио."; }
+      addItem("unlucky_medallion",1);
+      return "Пузырь оставляет на шее холодное ощущение и медальон неудачи. Кажется, это не к добру.";
+    }
+    case "siren_listen": {
+      const alive = player.units.filter(u=>!u.dead);
+      if (alive.length && Math.random()<0.5){
+        const u = alive[Math.floor(Math.random()*alive.length)];
+        const h = 5+Math.floor(Math.random()*8);
+        u.maxHp += h; u.hp = Math.min(u.maxHp, u.hp+h);
+        return "Пение странно успокаивает "+u.name+" — +"+h+" HP.";
+      }
+      const loss = 5+Math.floor(Math.random()*10); spendIo(loss);
+      return "Пение сбивает с толку — вы теряете "+loss+" Ио на ровном месте, не понимая как.";
+    }
+    case "bro_fist_bump": { const amt=8+Math.floor(Math.random()*12); player.io+=amt; return "Бро впечатляюще жмёт руку и суёт "+amt+" Ио. «Держись там, бро»."; }
+    case "bro_trade": {
+      const cost=10;
+      if (!canAffordIo(cost)) return "Бро разводит руками: «Нет Ио — нет обмена, бро».";
+      spendIo(cost); addItem("wind_key",1);
+      return "Бро протягивает странный заводной ключ. «Из моего измерения, бро. Полезная штука».";
+    }
+    case "gnome_help": {
+      if (!hasItem("stone",3)) return "Гномы недовольно качают головами: «Камня маловато».";
+      removeItem("stone",3); addItem("brick",2);
+      return "Гномы благодарно берут камень и взамен суют пару готовых кирпичей. «Не спрашивай, что мы строим».";
+    }
+    case "gnome_impressed": { player.io+=12; return "Гномы так рады слушателю, что суют вам 12 Ио «на сувениры»."; }
+    case "faucet_comfort": { addItem("waterchunk",1); return "Кран всхлипывает благодарно и роняет идеально твёрдую слезу — Кусок воды."; }
+    case "beer_random_unit": {
+      const alive = player.units.filter(u=>!u.dead);
+      if (!alive.length) return "Поить некого — отряд пуст.";
+      const unit = alive[Math.floor(Math.random()*alive.length)];
+      const effects = [
+        ()=>{ const h=4+Math.floor(Math.random()*5); unit.maxHp+=h; unit.hp=Math.min(unit.maxHp,unit.hp+h); return unit.name+" крепчает от пива — +"+h+" HP."; },
+        ()=>{ unit.dmg+=1; return unit.name+" воинственно рычит — +1 к урону."; },
+        ()=>{ unit.dmg=Math.max(0,unit.dmg-1); return unit.name+" пьёт залпом и слегка теряет координацию — -1 к урону."; },
+        ()=>{ return unit.name+" пробует пиво и морщится. Ничего не меняется."; }
+      ];
+      return "Фонтан окатывает "+unit.name+" пивом. "+effects[Math.floor(Math.random()*effects.length)]();
+    }
+    case "mirror_gaze": {
+      if (Math.random()<0.5){ addItem("lostring",1); return "В отражении что-то блестит — на полу оказывается потерянное кольцо."; }
+      return "Отражение просто корчит рожу в ответ. Неловко, но безопасно.";
+    }
+    case "tour_buy": {
+      const cost=20;
+      if (!canAffordIo(cost)) return "Продавец разводит руками: «Без Ио и экскурсии нет».";
+      spendIo(cost);
+      if (Math.random()<0.5){ const amt=30+Math.floor(Math.random()*20); player.io+=amt; return "Экскурсия неожиданно приводит к тайнику. Находите "+amt+" Ио — окупилось с горкой."; }
+      return "Экскурсия — это просто круг почёта вокруг одной и той же трубы. Продавец машет вслед, довольный собой.";
+    }
+    case "arcade_coin": {
+      const cost=10;
+      if (!canAffordIo(cost)) return "Автомат мигает «НЕТ ИО» и обиженно гаснет.";
+      spendIo(cost);
+      if (Math.random()<0.4){ addItem("medal",1); return "Автомат выдаёт медаль «За честную игру» и тихо играет победную мелодию."; }
+      return "Автомат рассказывает длинную нечленораздельную историю про «баг в 2007-м» и умолкает.";
+    }
+    case "arcade_kick": {
+      if (Math.random()<0.35){ const amt=15+Math.floor(Math.random()*15); player.io+=amt; return "Автомат от возмущения выплёвывает "+amt+" Ио из старого призового отсека."; }
+      return "Автомат просто мигает от боли. Стыдно, но терпимо.";
+    }
+    case "sock_tribute": {
+      if (!hasItem("cloth",2)) return "Носки указывают на пустые карманы: «Ткани маловато, дружище».";
+      removeItem("cloth",2);
+      return "Носки довольно кивают и пропускают отряд, не забыв всучить неприятный запах вслед.";
+    }
+    case "sock_talk": {
+      if (Math.random()<0.5){ player.io+=10; return "Носки проникаются вашей харизмой и даже скидываются по мелочи — 10 Ио."; }
+      const loss=8+Math.floor(Math.random()*8); spendIo(loss);
+      return "Переговоры проваливаются. Носки забирают "+loss+" Ио «за неуважение к текстилю».";
+    }
+    case "fridge_answer_door": { const amt=10+Math.floor(Math.random()*15); player.io+=amt; return "Холодильник скрипит одобрительно: «Дверь. Почти философично». Выдаёт "+amt+" Ио из недр."; }
+    case "fridge_answer_cold": { addItem("regen_elixir",1); return "«Холод. Тоже верно», — гудит холодильник и роняет на пол Эликсир регенерации."; }
+    case "fridge_silence": { return "Холодильник ждёт ответа целую вечность, не дожидается и молча захлопывается."; }
+    case "bear_directions": { const amt=10+Math.floor(Math.random()*10); player.io+=amt; return "Медведь на удивление вежливо благодарит за дорогу и, порывшись в люльке байка, суёт "+amt+" Ио."; }
+    case "mimic_support": { addItem("candy",1); return "Мимики радостно шелестят и в благодарность вручают одну из своих лучших масок — то есть конфету."; }
+    case "mimic_expose": {
+      if (Math.random()<0.5){ const amt=15+Math.floor(Math.random()*15); player.io+=amt; return "Разоблачённые мимики в панике роняют "+amt+" Ио и разбегаются."; }
+      return "Мимики оскорблены до глубины своей ненастоящей души и просто молча уходят.";
+    }
+    case "ghost_map": {
+      const cost=15;
+      if (!canAffordIo(cost)) return "Призрак вздыхает — эфемерно, но с явным разочарованием — и растворяется.";
+      spendIo(cost);
+      if (Math.random()<0.45){ addItem("lostring",1); return "Карта, как ни странно, настоящая. По ней находится Потерянное кольцо."; }
+      return "Карта ведёт точно в тупик, украшенный надписью «ТЫ ЛОХ» призрачными буквами.";
+    }
+    default: return "";
+  }
+}
+
 console.log("data module ok", Object.keys(ITEM_DB).length, "items,", Object.keys(UNIT_DB).length, "units,", RECIPES.length, "recipes");
+
+// ===================== QUEST TEMPLATES =====================
+// Simple fetch-quest template: bring `qty` of `itemId`, get Ио reward in [min,max]. Deliberately
+// bare-bones for now (per request) — a placeholder loop to build more interesting quest types on later.
+const QUEST_TEMPLATES = [
+  {itemId:"wires", qty:4, min:15, max:25, text:"Кто-то очень хочет получить 4 куска проводов. Не уточняется, кто и зачем — просто оставь их на видном месте."},
+  {itemId:"grime", qty:6, min:12, max:20, text:"Мартын клянётся, что почистит лавку, если натащишь ему как следует черни."},
+  {itemId:"biotrash", qty:3, min:20, max:32, text:"В канализации кто-то собирает биомусор для «личных целей». Спрашивать не рекомендуется."},
+  {itemId:"cloth", qty:5, min:15, max:24, text:"Нужна ткань. Много ткани. Что именно из неё шьют — государственная тайна."},
+  {itemId:"stone", qty:8, min:10, max:18, text:"Кто-то строит из камней нечто. Пока непонятно что, но камни нужны регулярно."},
+  {itemId:"potato", qty:6, min:14, max:22, text:"Картофельный дефицит. Официально — нет. Неофициально — принеси картошки."},
+  {itemId:"brick", qty:5, min:16, max:26, text:"Требуются кирпичи для укрепления чего-то, что укреплять явно поздно."}
+];
+var questIdCounter = 1;
+function makeQuestFromTemplate(t, textOverride){
+  return {
+    id: "q"+(questIdCounter++),
+    itemId: t.itemId,
+    qty: t.qty,
+    rewardIo: t.min + Math.floor(Math.random()*(t.max-t.min+1)),
+    text: textOverride || t.text
+  };
+}
+function ensureQuests(){
+  while (player.quests.length < 3){
+    const used = new Set(player.quests.map(q=>q.itemId));
+    let pool = QUEST_TEMPLATES.filter(t=>!used.has(t.itemId));
+    if (!pool.length) pool = QUEST_TEMPLATES;
+    const t = pool[Math.floor(Math.random()*pool.length)];
+    player.quests.push(makeQuestFromTemplate(t));
+  }
+}
+function claimQuest(qid){
+  const q = player.quests.find(x=>x.id===qid);
+  if (!q) return {ok:false, msg:"Квест не найден."};
+  if (!hasItem(q.itemId, q.qty)) return {ok:false, msg:"Не хватает предметов для сдачи."};
+  removeItem(q.itemId, q.qty);
+  player.io += q.rewardIo;
+  player.quests = player.quests.filter(x=>x.id!==qid);
+  ensureQuests();
+  return {ok:true, msg:`Квест сдан! +${q.rewardIo} Ио.`};
+}
+
+// ===================== NOTIFICATIONS (random calls) =====================
+// Small dialogue-tree "phone call" events. Each tree node: {text, options:[{label, next, effect, resultText}]}.
+// next === null ends the call (shows resultText or the effect's own message). effect === "vcvp_fight" is a
+// special case that hands off to a real battle instead of ending the dialogue normally.
+const NOTIF_TYPES = {
+  uncle_steyn: { icon:"📞", title:"Дядя Штейн", weight:3, tree:{
+    start: { text:"Штейн: Слушай, племянник, у меня тут дело намечается. Будешь слушать или сразу вешать трубку?",
+      options:[
+        {label:"Слушаю", next:"biz"},
+        {label:"Мне некогда", next:null, resultText:"Штейн разочарованно бурчит и кладёт трубку."}
+      ]},
+    biz: { text:"Штейн: Короче, мне тут задолжали, а платить не могут по уважительным причинам. Могу подкинуть тебе дело — не останусь в долгу. Или просто поболтаем, если дела не заходят.",
+      options:[
+        {label:"Что надо притащить?", effect:"steyn_quest", next:null},
+        {label:"Просто поболтаем", next:"chat2"}
+      ]},
+    chat2: { text:"Штейн травит байку о том, как когда-то обменял целую Бочку на честное слово. Слушать приятно, толку — ноль.",
+      options:[
+        {label:"Ладно, пока", effect:"steyn_chat_reward", next:null}
+      ]}
+  }},
+  vcvp: { icon:"🪐", title:"ВЦВП", weight:2, tree:{
+    start: { text:"Голос без интонации: Гражданин единицы измерения пространства-времени. Вы приписаны к призывному манёвру «Сектор-Ноль». Явка обязательна и одновременно необязательна — таковы правила ВЦВП.",
+      options:[
+        {label:"Есть ли от чего откосить?", next:"dodge"},
+        {label:"Что вообще происходит?", next:"explain"},
+        {label:"Положить трубку", next:null, resultText:"Голос продолжает говорить в пустоту ещё секунд десять после того, как вы положили трубку."}
+      ]},
+    dodge: { text:"Голос: Согласно приложению 12-би от призыва освобождаются лица, предоставившие доказательство собственного несуществования. У вас есть такое доказательство?",
+      options:[
+        {label:"Нет", next:"explain"},
+        {label:"Наверное?", effect:"vcvp_dodge_accept", next:null}
+      ]},
+    explain: { text:"Голос: Всевселенная нуждается в добровольцах для манёвров категории «Бусики». Отказ не предусмотрен формой, но предусмотрен реальностью.",
+      options:[
+        {label:"Приму бой", effect:"vcvp_fight", next:null},
+        {label:"Пожалуй, нет", next:null, resultText:"Голос: Ваше малодушие занесено в вечный реестр. Реестр никто и никогда не читает."}
+      ]}
+  }},
+  euclid: { icon:"📐", title:"Евклид", weight:2, tree:{
+    start: { text:"Евклид: Слушай. Что если два по-настоящему параллельных мнения на самом деле пересекаются — просто там, где ты не смотришь?",
+      options:[
+        {label:"Это бред", next:"argue"},
+        {label:"Возможно, ты прав", next:"agree"},
+        {label:"У меня нет времени на геометрию", next:null, resultText:"Евклид вздыхает пятимерным вздохом и кладёт трубку."}
+      ]},
+    argue: { text:"Евклид: Ты говоришь «бред» — но у самого слова «бред» есть форма. У формы есть углы. У углов есть я. Совпадение? Считаю, что нет.",
+      options:[
+        {label:"Ладно, сдаюсь, гений", effect:"euclid_argue_reward", next:null},
+        {label:"Мне пора", next:null, resultText:"Евклид торжествующе гудит вслед коротким гудкам."}
+      ]},
+    agree: { text:"Евклид: НАКОНЕЦ. Хоть кто-то понимает. Держи, в награду за прозрение.",
+      options:[
+        {label:"Спасибо, наверное", effect:"euclid_agree_reward", next:null}
+      ]}
+  }},
+  stasik: { icon:"🍄", title:"Стасик", weight:3, tree:{
+    start: { text:"Стасик: Слышь. Есть дело. Деревянное говно, грибы — всё свежее, всё честно добыто. Берёшь?",
+      options:[
+        {label:"Покажи товар", next:"shop"},
+        {label:"Не сегодня", next:null, resultText:"Стасик: Ну и зря. Ну и зря."}
+      ]},
+    shop: { text:"Стасик разворачивает список товара прямо в динамике. Как — не спрашивайте.",
+      options:[
+        {label:"3× Деревянное говно (12 Ио)", effect:"stasik_buy_wood", next:null},
+        {label:"Гриб Стасика — скормить юниту (18 Ио)", effect:"stasik_buy_mushroom", next:null},
+        {label:"Хватит, до связи", next:null, resultText:"Стасик: Как знаешь. Товар не портится. Наверное."}
+      ]}
+  }},
+  manul_lottery: { icon:"😼", title:"Король манулов (?)", weight:2, tree:{
+    start: { text:"Бархатный кошачий голос: Поздравляем! Ваш номер выиграл в Королевской Манульей Лотерее! Для получения приза продиктуйте код с обратной стороны Ио.",
+      options:[
+        {label:"Продиктовать код", effect:"manul_scammed", next:null},
+        {label:"Это развод", next:null, resultText:"Голос: Ну хвала манулам, хоть кто-то читает мелкий шрифт. — Голос злобно шипит и вешает трубку."},
+        {label:"Положить трубку", next:null, resultText:"Гудки. К счастью."}
+      ]}
+  }},
+  survey_bot: { icon:"🤖", title:"Опрос качества", weight:2, tree:{
+    start: { text:"Механический голос: Здравствуйте! Пожалуйста, оцените качество последней открытой посылки по шкале от 1 до «бесконечность».",
+      options:[
+        {label:"10 из 10!", effect:"survey_flattered", next:null},
+        {label:"Это был кошмар", effect:"survey_complain", next:null},
+        {label:"У меня нет на это времени", next:null, resultText:"Робот пищит: «Ваше молчание также зафиксировано как оценка.» Гудки."}
+      ]}
+  }},
+  mystery_call: { icon:"❔", title:"Неизвестный номер", weight:1, tree:{
+    start: { text:"На линии тишина. Потом — единственный вдох. Потом снова тишина.",
+      options:[
+        {label:"Алло?", next:"silence2"},
+        {label:"Положить трубку", next:null, resultText:"Гудки. Наверное, к лучшему."}
+      ]},
+    silence2: { text:"Тишина продолжается ровно семь секунд, будто кто-то считает.",
+      options:[
+        {label:"Ждать дальше", effect:"mystery_wait", next:null},
+        {label:"Бросить трубку первым", next:null, resultText:"Вы успеваете первым. Небольшая, но победа."}
+      ]}
+  }}
+};
+var notifIdCounter = 1;
+function rollForNotification(){
+  const unseenCount = player.notifications.filter(n=>!n.seen).length;
+  if (unseenCount >= 3) return;
+  if (Math.random() > 0.16) return;
+  const keys = Object.keys(NOTIF_TYPES);
+  const weights = keys.map(k=>NOTIF_TYPES[k].weight||1);
+  const total = weights.reduce((a,b)=>a+b,0);
+  let roll = Math.random()*total;
+  let chosen = keys[keys.length-1];
+  for (let i=0;i<keys.length;i++){
+    if (roll < weights[i]){ chosen = keys[i]; break; }
+    roll -= weights[i];
+  }
+  player.notifications.push({id:"n"+(notifIdCounter++), typeKey:chosen, seen:false});
+}
+function addSteynQuest(){
+  const t = QUEST_TEMPLATES[Math.floor(Math.random()*QUEST_TEMPLATES.length)];
+  const q = makeQuestFromTemplate(t, "Штейн: "+t.text);
+  player.quests.push(q);
+  return "Штейн скидывает дело на квестовую доску: "+itemName(t.itemId)+" ×"+t.qty+".";
+}
+function applyNotifEffect(key){
+  switch(key){
+    case "steyn_quest": return addSteynQuest();
+    case "steyn_chat_reward": { const amt=5+Math.floor(Math.random()*6); player.io+=amt; return "Штейн скидывает "+amt+" Ио «на такси, чтобы в следующий раз быстрее взял трубку»."; }
+    case "vcvp_dodge_accept": { const amt=8+Math.floor(Math.random()*10); player.io+=amt; return "Голос затыкается на десять секунд, затем: «Принято. Проверим позже.» Проверка, конечно, никогда не наступит. Заодно откуда-то капнуло "+amt+" Ио."; }
+    case "euclid_argue_reward": { addItem("madnessjar",1); return "Евклид торжествующе гудит и присылает банку «Безумия» — видимо, в награду за сдачу позиций."; }
+    case "euclid_agree_reward": { addItem("madnessjar",1); return "Евклид ликует и присылает банку «Безумия» — судя по всему, лучшее, что у него есть."; }
+    case "stasik_buy_wood": {
+      const cost=12;
+      if (!canAffordIo(cost)) return "Стасик щёлкает языком: «Не хватает Ио, дружище.»";
+      spendIo(cost); addItem("woodturd",3);
+      return "Стасик суёт в щель три деревянных говна. «Свежак, только что... ну, в общем свежак.»";
+    }
+    case "stasik_buy_mushroom": {
+      const cost=18;
+      if (!canAffordIo(cost)) return "Стасик щёлкает языком: «Не хватает Ио, дружище.»";
+      const alive = player.units.filter(u=>!u.dead);
+      if (!alive.length) return "Стасик хмыкает: «Кормить-то некого, у тебя отряд пустой.»";
+      spendIo(cost);
+      const unit = alive[Math.floor(Math.random()*alive.length)];
+      const effects = [
+        ()=>{ const h=3+Math.floor(Math.random()*4); unit.maxHp+=h; unit.hp=Math.min(unit.maxHp,unit.hp+h); return unit.name+" переваривает гриб и раздувается — +"+h+" HP."; },
+        ()=>{ unit.dmg+=1; return unit.name+" после гриба выглядит агрессивнее — +1 к урону."; },
+        ()=>{ unit.shld=(unit.shld||0)+1; return unit.name+" покрывается странной коркой — +1 к защите."; },
+        ()=>{ unit.dmg=Math.max(0,unit.dmg-1); return unit.name+" впадает в грибной транс и на время слабеет — -1 к урону. Стасик пожимает плечами: «Бывает.»"; },
+        ()=>{ return unit.name+" съедает гриб — и абсолютно ничего не происходит. Неловкая пауза."; }
+      ];
+      const line = effects[Math.floor(Math.random()*effects.length)]();
+      return "Гриб Стасика скормлен юниту «"+unit.name+"». "+line;
+    }
+    case "manul_scammed": { const loss=10+Math.floor(Math.random()*11); spendIo(loss); return "Голос мурлычет «Благословение манулов с вами» и обрывает связь. Пропало "+loss+" Ио (кто бы сомневался)."; }
+    case "survey_flattered": { const amt=8+Math.floor(Math.random()*8); player.io+=amt; return "Робот пищит от радости и присылает "+amt+" Ио «в знак благодарности за честность»."; }
+    case "survey_complain": { addItem("dirt",1); return "Робот шипит: «Ваша жалоба зафиксирована и немедленно проигнорирована.» Из динамика со стуком вываливается кусок земли — видимо, в отместку."; }
+    case "mystery_wait": {
+      if (Math.random()<0.35){ addItem("lostring",1); return "Связь обрывается. У твоих ног лежит потерянное кольцо, которого раньше не было."; }
+      return "Тишина обрывается гудками. Что бы это ни было — оно передумало.";
+    }
+    default: return "";
+  }
+}
 
 // ===================== GAME STATE =====================
 
@@ -714,7 +1220,9 @@ var player = {
   inventory: {}, // itemId -> count
   units: [],     // array of unit instances (roster, not deployed)
   discovered: {}, // itemId -> true, for the Каталог tab
-  lastArDay: null
+  lastArDay: null,
+  quests: [],       // active fetch-quests, see QUEST_TEMPLATES
+  notifications: [] // pending "phone call" notifications, see NOTIF_TYPES
 };
 
 function addItem(id, qty){
@@ -832,23 +1340,36 @@ function doCraft(recipeId){
 }
 
 // ===================== BATTLE ENGINE =====================
-// Sides have front[] and back[] arrays of fixed length with null or unit-instance.
-const FRONT_SLOTS = 4;
-const BACK_SLOTS = 4;
+// Round 8 rewrite: dynamic field width (grows with army size, capped) + individual per-unit targeting
+// (replacing the old pooled-cleave-through-the-row damage model) + shields resolved once per target per turn.
+const MIN_FIELD_WIDTH = 4;
+const MAX_FIELD_WIDTH = 10;
+const MAX_BATTLE_ROUNDS = 40; // safety cap — the new shield-pooling model can otherwise stalemate forever against high-shield foes
 
-function emptySide(){
-  return { front: new Array(FRONT_SLOTS).fill(null), back: new Array(BACK_SLOTS).fill(null) };
+function computeFieldWidth(playerCount, enemyCount){
+  return Math.min(MAX_FIELD_WIDTH, Math.max(MIN_FIELD_WIDTH, playerCount, enemyCount));
+}
+
+// Enemies are centered in the field so front-row column-range targeting (±1) actually reaches them
+// instead of leaving most of a wide player army stuck unable to hit a lone foe parked at column 0.
+function centeredStart(width, count){
+  return Math.max(0, Math.floor((width-count)/2));
+}
+
+function emptySide(width){
+  width = width || MIN_FIELD_WIDTH;
+  return { front: new Array(width).fill(null), back: new Array(width).fill(null) };
 }
 
 var battle = null; // current battle state
 
 function startBattle(mobKey, opts){
-  const enemy = emptySide();
-  if (mobKey !== null && mobKey !== undefined){
-    enemy.front[0] = makeEnemyInstance(mobKey);
-  }
+  const enemyUnit = (mobKey !== null && mobKey !== undefined) ? makeEnemyInstance(mobKey) : null;
+  const width = computeFieldWidth(player.units.length, enemyUnit ? 1 : 0);
+  const enemy = emptySide(width);
+  if (enemyUnit) enemy.front[centeredStart(width,1)] = enemyUnit;
   battle = {
-    player: emptySide(),
+    player: emptySide(width),
     enemy: enemy,
     round: 1,
     log: [],
@@ -856,7 +1377,8 @@ function startBattle(mobKey, opts){
     playerDestroyedCount: 0,
     sumDmgTaken: 0,
     result: null,
-    mobKey: mobKey
+    mobKey: mobKey,
+    width: width
   };
   return battle;
 }
@@ -882,6 +1404,7 @@ function deployUnit(uid, line, slotIndex){
   const slots = line === "front" ? battle.player.front : battle.player.back;
   if (slots[slotIndex]) return false;
   const [unit] = player.units.splice(idx,1);
+  unit.targetLine = null; unit.targetIdx = null; // fresh deploy — re-default target on first attack
   slots[slotIndex] = unit;
   return true;
 }
@@ -912,6 +1435,9 @@ function moveUnit(fromLine, fromIdx, toLine, toIdx){
   const tmp = toArr[toIdx];
   toArr[toIdx] = fromArr[fromIdx];
   fromArr[fromIdx] = tmp;
+  // a column change invalidates any locked-in target — it'll re-default (random valid) next resolution
+  if (toArr[toIdx]) { toArr[toIdx].targetLine = null; toArr[toIdx].targetIdx = null; }
+  if (fromArr[fromIdx]) { fromArr[fromIdx].targetLine = null; fromArr[fromIdx].targetIdx = null; }
   return true;
 }
 
@@ -932,46 +1458,80 @@ function effectiveShld(unit, lineName, rowArr, idx){
   return unit.shld + bonus;
 }
 
-function dealCleaveDamage(targetSide, totalDmg, isRanged, pierce){
-  // apply totalDmg across front row first (unless isRanged into back), overflow spills to next alive slot, then back row
-  let remaining = totalDmg;
-  pierce = pierce || 0;
-  const rows = isRanged
-    ? [{name:"back",arr:targetSide.back},{name:"front",arr:targetSide.front}]
-    : [{name:"front",arr:targetSide.front},{name:"back",arr:targetSide.back}];
-  for (const row of rows){
-    for (let i=0;i<row.arr.length && remaining>0;i++){
-      const u = row.arr[i];
-      if (!u || u.dead) continue;
-      if (u.dodgeChance && Math.random()*100 < u.dodgeChance){
-        logMsg(u.name+" уклоняется от всей атаки!");
-        remaining = 0;
-        break;
+// ---- targeting ----
+// Front-row attackers may only target the enemy FRONT-row unit directly opposite, or one column left/right
+// (up to 3 candidates). Back-row (ranged-only) attackers target their own column, front or back, on the enemy
+// side (2 candidates, default front). NOTE: by design front-row units never reach an enemy's back row even if
+// the enemy's front is wiped out in that column range — that's an intentional v1 simplification, worth revisiting
+// if a future encounter ever puts enemies exclusively in the back row.
+function validTargetsFor(ownLine, ownIdx, enemySide, width){
+  const candidates = [];
+  if (ownLine === "front"){
+    for (const d of [-1,0,1]){
+      const idx = ownIdx + d;
+      if (idx>=0 && idx<width){
+        const u = enemySide.front[idx];
+        if (u && !u.dead) candidates.push({line:"front", idx});
       }
-      const shld = Math.max(0, effectiveShld(u, row.name, row.arr, i) - pierce);
-      const dealt = Math.max(0, remaining - shld);
-      const actualDealt = Math.min(dealt, u.hp);
-      u.hp -= actualDealt;
-      remaining = remaining - shld - actualDealt;
-      if (remaining < 0) remaining = 0;
-      if (u.hp <= 0){
-        const reviveAbility = u.abilities.find(a=>a.type==="revive_once" && !u.usedRevive);
-        if (reviveAbility){
-          u.usedRevive = true;
-          u.hp = 1;
-          logMsg(u.name+" не сдаётся и поднимается с 1 HP!");
-        } else {
-          u.dead = true;
-          onUnitDeath(u, targetSide);
-        }
-      } else {
-        triggerOnHit(u, targetSide);
-        if (remaining <= 0) break;
-      }
-      if (remaining <= 0) break;
     }
-    if (remaining <= 0) break;
+  } else {
+    const f = enemySide.front[ownIdx];
+    const b = enemySide.back[ownIdx];
+    if (f && !f.dead) candidates.push({line:"front", idx:ownIdx});
+    if (b && !b.dead) candidates.push({line:"back", idx:ownIdx});
   }
+  return candidates;
+}
+
+function ensureUnitTarget(unit, ownLine, ownIdx, enemySide, width){
+  const candidates = validTargetsFor(ownLine, ownIdx, enemySide, width);
+  if (!candidates.length){ unit.targetLine = null; unit.targetIdx = null; return null; }
+  const current = candidates.find(c=>c.line===unit.targetLine && c.idx===unit.targetIdx);
+  if (current) return current;
+  const pick = candidates[Math.floor(Math.random()*candidates.length)];
+  unit.targetLine = pick.line; unit.targetIdx = pick.idx;
+  return pick;
+}
+
+// player-only: cycle the clicked unit's target to the next candidate (wraps around)
+function cycleUnitTarget(ownLine, ownIdx){
+  if (!battle) return;
+  const unit = ownLine==="front" ? battle.player.front[ownIdx] : battle.player.back[ownIdx];
+  if (!unit || unit.dead) return;
+  const candidates = validTargetsFor(ownLine, ownIdx, battle.enemy, battle.width);
+  if (!candidates.length) return;
+  const curIdx = candidates.findIndex(c=>c.line===unit.targetLine && c.idx===unit.targetIdx);
+  const next = candidates[(curIdx+1) % candidates.length];
+  unit.targetLine = next.line; unit.targetIdx = next.idx;
+}
+
+// resolve total pooled damage aimed at ONE target this turn: shield subtracts once from the total, not per attacker
+function applyDamageToTarget(defenderSide, line, idx, totalDmg, pierce){
+  const arr = line==="front" ? defenderSide.front : defenderSide.back;
+  const u = arr[idx];
+  if (!u || u.dead || totalDmg<=0) return 0;
+  if (u.dodgeChance && Math.random()*100 < u.dodgeChance){
+    logMsg(u.name+" уклоняется от всей атаки!");
+    return 0;
+  }
+  const shld = Math.max(0, effectiveShld(u, line, arr, idx) - (pierce||0));
+  const dealt = Math.max(0, totalDmg - shld);
+  const actualDealt = Math.min(dealt, u.hp);
+  u.hp -= actualDealt;
+  if (u.hp <= 0){
+    const reviveAbility = u.abilities.find(a=>a.type==="revive_once" && !u.usedRevive);
+    if (reviveAbility){
+      u.usedRevive = true;
+      u.hp = 1;
+      logMsg(u.name+" не сдаётся и поднимается с 1 HP!");
+    } else {
+      u.dead = true;
+      onUnitDeath(u, defenderSide);
+    }
+  } else {
+    triggerOnHit(u, defenderSide);
+  }
+  return actualDealt;
 }
 
 function triggerOnHit(unit, side){
@@ -1033,34 +1593,14 @@ function maxArmorPierce(units){
   return best;
 }
 
-function resolvePlayerAttack(){
-  if (battle.phase !== "playerTurn") return;
-  battle.phase = "resolving";
-  let normalDmg = 0, rangedDmg = 0;
-  const enemyFrontAlive = firstAlive(battle.enemy.front);
-  const frontUnits = aliveList(battle.player.front).map(x=>x.u);
-  const backUnits = aliveList(battle.player.back).map(x=>x.u);
-  const contributingNormal = [], contributingRanged = [];
-  for (const u of frontUnits){
-    const ranged = u.abilities.some(a=>a.type==="ranged_attack");
-    const mirrors = u.abilities.some(a=>a.type==="mirror_enemy_dmg");
-    const baseDmg = (mirrors && enemyFrontAlive) ? enemyFrontAlive.u.dmg : u.dmg;
-    if (mirrors && enemyFrontAlive) logMsg(u.name+" считывает повадки "+enemyFrontAlive.u.name+" и бьёт на "+baseDmg+".");
-    const dmg = rollCritDmg(u, baseDmg);
-    if (ranged){ rangedDmg += dmg; contributingRanged.push(u); } else { normalDmg += dmg; contributingNormal.push(u); }
-  }
-  for (const u of backUnits){
-    const ranged = u.abilities.some(a=>a.type==="ranged_attack");
-    if (ranged){ rangedDmg += rollCritDmg(u, u.dmg); contributingRanged.push(u); } // only ranged units can act from back
-  }
-  // bard periodic heal
-  for (const {u} of [...aliveList(battle.player.front), ...aliveList(battle.player.back)]){
+function runPeriodicHeals(side){
+  const all = [...aliveList(side.front), ...aliveList(side.back)].map(x=>x.u);
+  for (const u of all){
     for (const ab of u.abilities){
       if (ab.type==="periodic_heal"){
         u.turnCounter++;
         if (u.turnCounter % ab.every === 0){
-          const target = [...aliveList(battle.player.front), ...aliveList(battle.player.back)]
-            .map(x=>x.u).filter(x=>x!==u && x.hp<x.maxHp).sort((a,b)=>a.hp-b.hp)[0];
+          const target = all.filter(x=>x!==u && x.hp<x.maxHp).sort((a,b)=>a.hp-b.hp)[0];
           if (target){
             target.hp = Math.min(target.maxHp, target.hp+ab.amount);
             logMsg(u.name+" исцеляет "+target.name+" на "+ab.amount+" HP.");
@@ -1069,9 +1609,57 @@ function resolvePlayerAttack(){
       }
     }
   }
-  if (normalDmg>0) dealCleaveDamage(battle.enemy, normalDmg, false, maxArmorPierce(contributingNormal));
-  if (rangedDmg>0) dealCleaveDamage(battle.enemy, rangedDmg, true, maxArmorPierce(contributingRanged));
-  logMsg("Ваша армия наносит "+(normalDmg+rangedDmg)+" урона.");
+}
+
+// One side (attackerSide) attacks the other (defenderSide). Every eligible unit picks/keeps an individual
+// target; damage is pooled per-target (so several attackers hitting the same enemy stack into one shield check).
+function resolveAttacks(attackerSide, defenderSide){
+  const width = battle.width;
+  const attackers = [];
+  ["front","back"].forEach(lineName=>{
+    const arr = lineName==="front" ? attackerSide.front : attackerSide.back;
+    arr.forEach((u,idx)=>{
+      if (!u || u.dead) return;
+      if (lineName==="back"){
+        const ranged = u.abilities.some(a=>a.type==="ranged_attack");
+        if (!ranged) return; // only ranged units can act from the back line
+      }
+      attackers.push({u, line:lineName, idx});
+    });
+  });
+
+  const pools = new Map(); // "line:idx" -> {line, idx, dmg, contributors:[]}
+  for (const {u, line, idx} of attackers){
+    ensureUnitTarget(u, line, idx, defenderSide, width);
+    if (u.targetLine==null) continue; // nothing in range to hit this turn
+    const targetArr = u.targetLine==="front" ? defenderSide.front : defenderSide.back;
+    const targetUnit = targetArr[u.targetIdx];
+    const mirrors = u.abilities.some(a=>a.type==="mirror_enemy_dmg");
+    let baseDmg = (mirrors && targetUnit) ? targetUnit.dmg : u.dmg;
+    if (mirrors && targetUnit) logMsg(u.name+" считывает повадки "+targetUnit.name+" и бьёт на "+baseDmg+".");
+    if (u.scalingDmgPerKill) baseDmg += u.scalingDmgPerKill*battle.playerDestroyedCount;
+    const dmg = rollCritDmg(u, baseDmg);
+    const key = u.targetLine+":"+u.targetIdx;
+    if (!pools.has(key)) pools.set(key, {line:u.targetLine, idx:u.targetIdx, dmg:0, contributors:[]});
+    const pool = pools.get(key);
+    pool.dmg += dmg;
+    pool.contributors.push(u);
+  }
+
+  let totalDealt = 0;
+  for (const pool of pools.values()){
+    const pierce = maxArmorPierce(pool.contributors);
+    totalDealt += applyDamageToTarget(defenderSide, pool.line, pool.idx, pool.dmg, pierce);
+  }
+  return totalDealt;
+}
+
+function resolvePlayerAttack(){
+  if (battle.phase !== "playerTurn") return;
+  battle.phase = "resolving";
+  runPeriodicHeals(battle.player);
+  const dealt = resolveAttacks(battle.player, battle.enemy);
+  logMsg("Ваша армия наносит "+dealt+" урона.");
 
   if (aliveList(battle.enemy.front).length===0 && aliveList(battle.enemy.back).length===0){
     endBattle(true);
@@ -1082,29 +1670,27 @@ function resolvePlayerAttack(){
 }
 
 function resolveEnemyAttack(){
-  const enemies = [...aliveList(battle.enemy.front), ...aliveList(battle.enemy.back)].map(x=>x.u);
-  let total = 0;
-  for (const e of enemies){
-    let d = e.dmg;
-    if (e.scalingDmgPerKill) d += e.scalingDmgPerKill*battle.playerDestroyedCount;
-    total += d;
-  }
-  if (total>0){
-    dealCleaveDamage(battle.player, total, false, maxArmorPierce(enemies));
-    battle.sumDmgTaken += total;
-    logMsg("Противник наносит "+total+" урона.");
+  const dealt = resolveAttacks(battle.enemy, battle.player);
+  if (dealt>0){
+    battle.sumDmgTaken += dealt;
+    logMsg("Противник наносит "+dealt+" урона.");
   }
   if (aliveList(battle.player.front).length===0 && aliveList(battle.player.back).length===0){
     endBattle(false);
     return;
   }
   battle.round++;
+  if (battle.round > MAX_BATTLE_ROUNDS){
+    logMsg("Бой затягивается сверх всякой разумности — обе стороны выдыхаются и расходятся по домам.");
+    endBattle(false, true);
+    return;
+  }
   battle.phase = "playerTurn";
 }
 
-function endBattle(victory){
+function endBattle(victory, stalemate){
   battle.phase = "over";
-  battle.result = victory ? "victory" : "defeat";
+  battle.result = victory ? "victory" : (stalemate ? "stalemate" : "defeat");
   // return surviving deployed units to roster
   for (const row of [battle.player.front, battle.player.back]){
     for (const u of row){
@@ -1123,12 +1709,15 @@ function endBattle(victory){
             logMsg(u.name+" находит ещё "+ab.amount+" Ио в карманах врага.");
           }
         }
+        u.targetLine = null; u.targetIdx = null;
         player.units.push(u);
       }
     }
   }
   if (victory){
     logMsg("Противник повержен!");
+  } else if (stalemate){
+    logMsg("Ничья. Отряд отступает — тут явно ловить нечего.");
   } else {
     logMsg("Отряд разбит...");
   }
@@ -1308,14 +1897,34 @@ function applySpinResult(result){
 }
 
 function startCasinoFight(){
-  const enemy = emptySide();
-  enemy.front[0] = { uid: nextUid(), unitId:"casino_enemy", name: CASINO_ENEMY.name,
+  const width = computeFieldWidth(player.units.length, 1);
+  const enemy = emptySide(width);
+  enemy.front[centeredStart(width,1)] = { uid: nextUid(), unitId:"casino_enemy", name: CASINO_ENEMY.name,
     hp: CASINO_ENEMY.hp, maxHp: CASINO_ENEMY.hp, dmg: CASINO_ENEMY.dmg, shld: CASINO_ENEMY.shld,
     abilities: [], turnCounter:0, dead:false };
   battle = {
-    player: emptySide(), enemy, round:1, log:[], phase:"setup",
-    playerDestroyedCount:0, sumDmgTaken:0, result:null, mobKey:null, isCasinoFight:true
+    player: emptySide(width), enemy, round:1, log:[], phase:"setup",
+    playerDestroyedCount:0, sumDmgTaken:0, result:null, mobKey:null, isCasinoFight:true, width:width
   };
+  return battle;
+}
+
+// ВЦВП notification call, "Приму бой" branch: 2-3 weak "Бусики".
+function startConscriptionFight(){
+  const count = 2 + Math.floor(Math.random()*2); // 2-3
+  const width = computeFieldWidth(player.units.length, count);
+  const enemy = emptySide(width);
+  const start = centeredStart(width, count);
+  for (let i=0;i<count;i++){
+    enemy.front[start+i] = { uid: nextUid(), unitId:"busik", name:"Бусик *", hp:9, maxHp:9, dmg:2, shld:0,
+      abilities: [], turnCounter:0, dead:false };
+  }
+  battle = {
+    player: emptySide(width), enemy, round:1, log:[], phase:"setup",
+    playerDestroyedCount:0, sumDmgTaken:0, result:null, mobKey:null, isConscriptionFight:true, width:width
+  };
+  returnTabAfterBattle = currentTab;
+  currentTab = "expedition";
   return battle;
 }
 
@@ -1340,7 +1949,7 @@ function advanceExpeditionAfterVictory(){
   const mobKey = currentExpeditionMob();
   const base = SEWER_MOBS[mobKey];
   if (base.flag) expedition.flags[base.flag] = true;
-  expedition.sumDmg += battle.sumDmgTaken;
+  expedition.sumDmg += battle ? battle.sumDmgTaken : 0; // battle is null when a sewer event resolved peacefully
   expedition.nodeIndex++;
   if (expedition.nodeIndex >= expedition.route.length){
     // route complete -> final reward
@@ -1350,6 +1959,7 @@ function advanceExpeditionAfterVictory(){
     player.ar += (reward.ar||0);
     expedition.active = false;
     expedition.finalReward = reward;
+    rollForNotification();
     return {done:true, reward};
   }
   return {done:false, nextMob: currentExpeditionMob(), barrelTrade: base.flag==="barrel"};
@@ -1357,6 +1967,88 @@ function advanceExpeditionAfterVictory(){
 
 function abandonExpedition(){
   expedition = null;
+}
+
+// Enters the node for `mobKey`: ~25% of the time (for eligible non-boss, non-flagged mobs) a random
+// narrative encounter plays instead of the straight fight; otherwise it's a normal battle as before.
+function proceedToNode(mobKey){
+  const base = SEWER_MOBS[mobKey];
+  const eligible = base && !base.boss && !base.flag;
+  if (eligible && Math.random() < 0.25){
+    startSewerEvent();
+  } else {
+    startBattle(mobKey);
+  }
+  renderAll();
+}
+
+// Shared tail used both after a normal mob victory and after a narrative event resolves peacefully or
+// via a won ad-hoc fight — the underlying route node still advances/rewards exactly the same either way.
+function continueExpeditionAfterNode(){
+  const res = advanceExpeditionAfterVictory();
+  battle = null;
+  if (res.done){
+    renderAll();
+    return;
+  }
+  if (res.barrelTrade && !expedition.tradeShown){
+    expedition.tradeShown = true;
+    expedition.pendingNextMob = res.nextMob;
+    renderDiogenTrade();
+    return;
+  }
+  proceedToNode(res.nextMob);
+}
+
+// ===================== SEWER EVENT CONTROLLER =====================
+var sewerEventTypeKey = null;
+var sewerEventNode = null;
+var sewerEventEndMsg = null;
+
+function startSewerEvent(){
+  const keys = Object.keys(SEWER_EVENTS);
+  sewerEventTypeKey = keys[Math.floor(Math.random()*keys.length)];
+  sewerEventNode = "start";
+  sewerEventEndMsg = null;
+}
+
+function chooseSewerEventOption(idx){
+  const type = SEWER_EVENTS[sewerEventTypeKey];
+  const node = type.tree[sewerEventNode];
+  const opt = node.options[idx];
+  if (!opt) return;
+  if (opt.fight){
+    startEventFight(opt.fight);
+    return;
+  }
+  const effectMsg = opt.effect ? applySewerEventEffect(opt.effect) : "";
+  if (opt.next){
+    sewerEventNode = opt.next;
+  } else {
+    sewerEventEndMsg = opt.resultText || effectMsg || "Вы идёте дальше.";
+  }
+}
+
+function closeSewerEvent(){
+  sewerEventTypeKey = null; sewerEventNode = null; sewerEventEndMsg = null;
+  continueExpeditionAfterNode();
+}
+
+// Ad-hoc battle triggered from a narrative event's "fight" option — several defs, centered on the field
+// like other multi-enemy encounters, so front-row column targeting has room to matter.
+function startEventFight(enemyDefs){
+  const width = computeFieldWidth(player.units.length, enemyDefs.length);
+  const enemy = emptySide(width);
+  const start = centeredStart(width, enemyDefs.length);
+  enemyDefs.forEach((d,i)=>{
+    enemy.front[start+i] = { uid: nextUid(), unitId:"sewer_event_enemy", name:d.name,
+      hp:d.hp, maxHp:d.hp, dmg:d.dmg, shld:d.shld||0, abilities:[], turnCounter:0, dead:false };
+  });
+  battle = {
+    player: emptySide(width), enemy, round:1, log:[], phase:"setup",
+    playerDestroyedCount:0, sumDmgTaken:0, result:null, mobKey:null, isSewerEvent:true, width:width
+  };
+  return battle;
 }
 
 console.log("ui module (logic part) ok");
@@ -1381,6 +2073,11 @@ var casinoBetDraft = "10";
 var wheelRotation = 0;
 var casinoFightPending = false;
 var mimicPending = null; // holds pending mimic instance data while confirmation shown
+var notifOpenId = null; // id of the notification currently open in the dialogue view
+var notifDialogueNode = null; // current tree node key within the open notification
+var notifEndMsg = null; // set when a dialogue branch ends, shown with a "close" button
+var notifFlashMsg = null; // one-shot message shown atop the notifications list (e.g. battle result)
+var questMessage = null; // one-shot message shown atop the quests list
 
 player.freeCases = 0;
 
@@ -1569,6 +2266,11 @@ function renderTopbar(){
   document.querySelectorAll(".tabs button").forEach(b=>{
     b.classList.toggle("active", b.dataset.tab===currentTab);
   });
+  const notifBtn = document.querySelector('.tabs button[data-tab="notifications"]');
+  if (notifBtn){
+    const hasUnseen = player.notifications && player.notifications.some(n=>!n.seen);
+    notifBtn.classList.toggle("has-notif", !!hasUnseen);
+  }
 }
 
 // ===================== RENDER: INVENTORY =====================
@@ -1714,6 +2416,7 @@ function onOpenBigCase(){
     return;
   }
   caseLog.push({id:result.item.id, name:result.item.name, rarity:result.rarity});
+  rollForNotification();
   renderAll();
 }
 
@@ -1722,6 +2425,7 @@ function onOpenMechaCase(){
   spendIo(MECHA_CASE_COST);
   const result = openMechaCase();
   mechaCaseLog.push({id:result.item.id, name:result.item.name, rarity:result.rarity});
+  rollForNotification();
   renderAll();
 }
 
@@ -1730,6 +2434,7 @@ function onOpenCrapCase(){
   spendIo(CRAP_CASE_COST);
   const result = openCrapCase();
   crapCaseLog.push({id:result.item.id, name:result.item.name, rarity:result.rarity});
+  rollForNotification();
   renderAll();
 }
 
@@ -1775,6 +2480,7 @@ function renderCraft(){
 function renderExpedition(){
   if (mimicPending){ renderMimicPrompt(); return; }
   if (casinoFightPending){ renderCasinoFightPrompt(); return; }
+  if (sewerEventTypeKey && !battle){ renderSewerEvent(); return; }
   if (!battle){
     if (expedition && !expedition.active && expedition.finalReward){
       renderExpeditionReport();
@@ -1802,22 +2508,53 @@ function renderExpeditionHub(){
   lastExpeditionMsg = null;
   document.getElementById("start-expedition-btn").addEventListener("click", ()=>{
     startExpedition();
-    startBattle(currentExpeditionMob());
-    renderAll();
+    proceedToNode(currentExpeditionMob());
+  });
+}
+
+// Narrative "encounter" screen for a Round-7 sewer event — reuses the same dialogue-tree pattern
+// (and .notif-* CSS) as the phone-call notifications.
+function renderSewerEvent(){
+  const type = SEWER_EVENTS[sewerEventTypeKey];
+  if (sewerEventEndMsg){
+    document.getElementById("view").innerHTML = `
+      <section class="panel">
+        <h2>${type.icon} ${type.title}</h2>
+        <p class="notif-text">${sewerEventEndMsg}</p>
+        <button class="btn btn-primary" id="sewer-event-continue-btn">Идти дальше</button>
+      </section>
+    `;
+    document.getElementById("sewer-event-continue-btn").addEventListener("click", closeSewerEvent);
+    return;
+  }
+  const node = type.tree[sewerEventNode];
+  const optsHtml = node.options.map((o,i)=>`<button class="btn notif-opt" data-opt="${i}">${o.label}</button>`).join("");
+  document.getElementById("view").innerHTML = `
+    <section class="panel">
+      <h2>${type.icon} ${type.title}</h2>
+      <p class="notif-text">${node.text}</p>
+      <div class="notif-options">${optsHtml}</div>
+    </section>
+  `;
+  document.getElementById("view").querySelectorAll('[data-opt]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{ chooseSewerEventOption(parseInt(btn.dataset.opt,10)); renderAll(); });
   });
 }
 
 function renderBattleSetup(){
   const mobKey = battle.mobKey;
-  const enemy = battle.enemy.front[0];
+  const enemyAliveList = [...aliveList(battle.enemy.front), ...aliveList(battle.enemy.back)];
+  const soloBoss = enemyAliveList.length<=1 ? (enemyAliveList[0] ? enemyAliveList[0].u : null) : null;
   const rosterHtml = player.units.length
     ? player.units.map(u=>unitCardHtml(u,{draggable:true, role:"roster", selected: !!(selected && selected.type==="roster" && selected.uid===u.uid)})).join("")
     : `<div class="empty-note">Все уже на позициях.</div>`;
 
   document.getElementById("view").innerHTML = `
     <section class="panel enemy-panel">
-      <h2>Враг${enemy&&enemy.boss?' <span class="boss-tag">БОСС</span>':''}</h2>
-      <div class="line-slots single">${unitCardHtml(enemy,{draggable:false})}</div>
+      <h2>Враг${soloBoss&&soloBoss.boss?' <span class="boss-tag">БОСС</span>':''}</h2>
+      ${soloBoss
+        ? `<div class="line-slots single">${unitCardHtml(soloBoss,{draggable:false})}</div>`
+        : rowHtml("Строй","enemy","front", battle.enemy.front)}
     </section>
     <section class="panel">
       <h2>Расстановка отряда</h2>
@@ -1911,14 +2648,17 @@ function renderBattleFight(){
     renderAll();
   });
   wireBattleArrows();
+  wireTargeting();
 }
 
 function renderBattleOver(){
   const victory = battle.result==="victory";
+  const stalemate = battle.result==="stalemate";
   const isMimic = battle.isMimic;
+  const title = victory ? (isMimic? "Мимик уничтожен!" : "Узел пройден") : (stalemate ? "Бой зашёл в тупик" : "Отряд разбит");
   document.getElementById("view").innerHTML = `
     <section class="panel">
-      <h2>${victory? (isMimic? "Мимик уничтожен!" : "Узел пройден") : "Отряд разбит"}</h2>
+      <h2>${title}</h2>
       <div class="battle-log">${battle.log.slice(-8).map(l=>`<div class="log-line">${l}</div>`).join("")}</div>
       <button class="btn btn-primary" id="continue-btn">Продолжить</button>
     </section>
@@ -1956,26 +2696,43 @@ function onBattleOverContinue(){
     renderAll();
     return;
   }
+  if (battle.isConscriptionFight){
+    battle = null;
+    if (victory){
+      const ioBonus = 25 + Math.floor(Math.random()*26);
+      addItem("beadhandful", 1);
+      player.io += ioBonus;
+      notifFlashMsg = "Отряд «Бусиков» разбит. ВЦВП роняет трубку — с ней падает "+ioBonus+" Ио и горсть бус.";
+    } else {
+      notifFlashMsg = "Бусики оказались на удивление злыми. Отряд отступает — ВЦВП обещает перезвонить.";
+    }
+    if (notifOpenId){ player.notifications = player.notifications.filter(n=>n.id!==notifOpenId); }
+    notifOpenId = null; notifDialogueNode = null; notifEndMsg = null;
+    currentTab = returnTabAfterBattle || "notifications";
+    returnTabAfterBattle = null;
+    renderAll();
+    return;
+  }
+  if (battle.isSewerEvent){
+    const wasVictory = victory;
+    battle = null;
+    if (!wasVictory){
+      expedition = null;
+      sewerEventTypeKey = null; sewerEventNode = null; sewerEventEndMsg = null;
+      renderAll();
+      return;
+    }
+    sewerEventTypeKey = null; sewerEventNode = null; sewerEventEndMsg = null;
+    continueExpeditionAfterNode();
+    return;
+  }
   if (!victory){
     battle = null;
     expedition = null;
     renderAll();
     return;
   }
-  const res = advanceExpeditionAfterVictory();
-  battle = null;
-  if (res.done){
-    renderAll(); // will show expedition report
-    return;
-  }
-  if (res.barrelTrade && !expedition.tradeShown){
-    expedition.tradeShown = true;
-    expedition.pendingNextMob = res.nextMob;
-    renderDiogenTrade();
-    return;
-  }
-  startBattle(res.nextMob);
-  renderAll();
+  continueExpeditionAfterNode();
 }
 
 function renderDiogenTrade(){
@@ -1996,8 +2753,7 @@ function renderDiogenTrade(){
     btn.addEventListener("click", ()=> doDiogenTrade(btn.dataset.trade));
   });
   document.getElementById("leave-trader-btn").addEventListener("click", ()=>{
-    startBattle(expedition.pendingNextMob);
-    renderAll();
+    proceedToNode(expedition.pendingNextMob);
   });
 }
 
@@ -2116,6 +2872,42 @@ function renderMimicPrompt(){
     battle.enemy.front[0] = { uid: nextUid(), unitId:"mimic", name:"Мимик", hp:m.hp, maxHp:m.hp, dmg:m.dmg, shld:m.shld, abilities:[], turnCounter:0, dead:false };
     renderAll();
   });
+}
+
+// ===================== NOTIFICATION DIALOGUE CONTROLLER =====================
+function openNotification(id){
+  const n = player.notifications.find(x=>x.id===id);
+  if (!n) return;
+  n.seen = true;
+  notifOpenId = id;
+  notifDialogueNode = "start";
+  notifEndMsg = null;
+}
+function closeNotification(){
+  if (notifOpenId){
+    player.notifications = player.notifications.filter(x=>x.id!==notifOpenId);
+  }
+  notifOpenId = null;
+  notifDialogueNode = null;
+  notifEndMsg = null;
+}
+function chooseNotifOption(idx){
+  const n = player.notifications.find(x=>x.id===notifOpenId);
+  if (!n) return;
+  const type = NOTIF_TYPES[n.typeKey];
+  const node = type.tree[notifDialogueNode];
+  const opt = node.options[idx];
+  if (!opt) return;
+  if (opt.effect === "vcvp_fight"){
+    startConscriptionFight();
+    return;
+  }
+  const effectMsg = opt.effect ? applyNotifEffect(opt.effect) : "";
+  if (opt.next){
+    notifDialogueNode = opt.next;
+  } else {
+    notifEndMsg = opt.resultText || effectMsg || "Разговор окончен.";
+  }
 }
 
 // ===================== RENDER: MECHA WORKSHOP =====================
@@ -2478,6 +3270,40 @@ function wireBattleArrows(){
   wireBattleItemTray();
 }
 
+// Round 8: hover-reveal target badge on each attacking player unit (➤ front-row, ✛ back-row ranged),
+// click to cycle to the next valid candidate; hovering also outlines the currently-targeted enemy slot.
+function wireTargeting(){
+  if (!battle || battle.phase !== "playerTurn") return;
+  const view = document.getElementById("view");
+  view.querySelectorAll('.unit-slot.filled[data-side="player"]').forEach(slotEl=>{
+    const line = slotEl.dataset.line, idx = Number(slotEl.dataset.idx);
+    const unit = line==="front" ? battle.player.front[idx] : battle.player.back[idx];
+    if (!unit || unit.dead) return;
+    const isRanged = unit.abilities.some(a=>a.type==="ranged_attack");
+    if (line==="back" && !isRanged) return; // this unit doesn't attack from the back line — no targeting UI
+    ensureUnitTarget(unit, line, idx, battle.enemy, battle.width);
+    if (unit.targetLine==null) return; // nothing in range right now
+
+    const badge = document.createElement("div");
+    badge.className = "target-badge";
+    badge.title = "Сменить цель";
+    badge.textContent = (line==="back" ? "✛" : "➤");
+    badge.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      cycleUnitTarget(line, idx);
+      renderAll();
+    });
+    slotEl.appendChild(badge);
+
+    const targetSlotEl = view.querySelector(`.unit-slot[data-side="enemy"][data-line="${unit.targetLine}"][data-idx="${unit.targetIdx}"]`);
+    const card = slotEl.querySelector(".unit-card");
+    if (card && targetSlotEl){
+      card.addEventListener("mouseenter", ()=>{ targetSlotEl.classList.add("is-targeted"); });
+      card.addEventListener("mouseleave", ()=>{ targetSlotEl.classList.remove("is-targeted"); });
+    }
+  });
+}
+
 function applyBattleItemToSlot(slotEl, itemId){
   if (!itemId) return;
   const cardEl = slotEl.querySelector("[data-uid]");
@@ -2574,6 +3400,95 @@ function wireBoardInteractions(){
   });
 }
 
+// ===================== RENDER: QUESTS =====================
+function renderQuests(){
+  ensureQuests();
+  const cards = player.quests.map(q=>{
+    const have = player.inventory[q.itemId]||0;
+    const enough = have >= q.qty;
+    return `
+      <div class="quest-card">
+        <div class="quest-text">${q.text}</div>
+        <div class="quest-req">Нужно: ${itemName(q.itemId)} — ${have}/${q.qty}</div>
+        <div class="quest-reward">Награда: ${q.rewardIo} Ио</div>
+        <button class="btn ${enough?"btn-primary":""}" data-claim-quest="${q.id}" ${enough?"":"disabled"}>Сдать</button>
+      </div>`;
+  }).join("");
+  document.getElementById("view").innerHTML = `
+    <section class="panel">
+      <h2>Квесты</h2>
+      <p class="muted">Простые поручения за Ио — принеси нужное количество предмета и сдай. Пока без затей, дальше будет интереснее.</p>
+      ${questMessage ? `<p class="inv-message">${questMessage}</p>` : ""}
+      <div class="quest-list">${cards}</div>
+    </section>
+  `;
+  document.getElementById("view").querySelectorAll('[data-claim-quest]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const res = claimQuest(btn.dataset.claimQuest);
+      questMessage = res.msg || null;
+      renderAll();
+    });
+  });
+}
+
+// ===================== RENDER: NOTIFICATIONS =====================
+function renderNotifications(){
+  if (notifOpenId){
+    const n = player.notifications.find(x=>x.id===notifOpenId);
+    if (n){
+      const type = NOTIF_TYPES[n.typeKey];
+      if (notifEndMsg){
+        document.getElementById("view").innerHTML = `
+          <section class="panel">
+            <h2>${type.icon} ${type.title}</h2>
+            <p class="notif-text">${notifEndMsg}</p>
+            <button class="btn btn-primary" id="notif-close-btn">Положить трубку</button>
+          </section>
+        `;
+        document.getElementById("notif-close-btn").addEventListener("click", ()=>{ closeNotification(); renderAll(); });
+        return;
+      }
+      const node = type.tree[notifDialogueNode];
+      const optsHtml = node.options.map((o,i)=>`<button class="btn notif-opt" data-opt="${i}">${o.label}</button>`).join("");
+      document.getElementById("view").innerHTML = `
+        <section class="panel">
+          <h2>${type.icon} ${type.title}</h2>
+          <p class="notif-text">${node.text}</p>
+          <div class="notif-options">${optsHtml}</div>
+        </section>
+      `;
+      document.getElementById("view").querySelectorAll('[data-opt]').forEach(btn=>{
+        btn.addEventListener("click", ()=>{ chooseNotifOption(parseInt(btn.dataset.opt,10)); renderAll(); });
+      });
+      return;
+    }
+  }
+  // list view — visiting the tab marks everything as seen (clears the tab's red dot)
+  player.notifications.forEach(n=>{ n.seen = true; });
+  const flashHtml = notifFlashMsg ? `<p class="inv-message">${notifFlashMsg}</p>` : "";
+  let listHtml;
+  if (!player.notifications.length){
+    listHtml = `<p class="empty-note">Тихо. Никто не звонит. Есть в этом что-то тревожное.</p>`;
+  } else {
+    listHtml = `<div class="notif-list">` + player.notifications.map(n=>{
+      const type = NOTIF_TYPES[n.typeKey];
+      return `<div class="notif-item" data-open-notif="${n.id}"><span class="notif-icon">${type.icon}</span><span class="notif-title">${type.title}</span><span class="notif-arrow">→</span></div>`;
+    }).join("") + `</div>`;
+  }
+  document.getElementById("view").innerHTML = `
+    <section class="panel">
+      <h2>Уведомления</h2>
+      <p class="muted">Иногда звонят — после открытия кейсов или возвращения из похода. Иногда лучше бы не отвечать.</p>
+      ${flashHtml}
+      ${listHtml}
+    </section>
+  `;
+  notifFlashMsg = null;
+  document.getElementById("view").querySelectorAll('[data-open-notif]').forEach(el=>{
+    el.addEventListener("click", ()=>{ openNotification(el.dataset.openNotif); renderAll(); });
+  });
+}
+
 // ===================== PERSISTENCE =====================
 // Uses window.storage when running as a Claude.ai artifact; falls back to localStorage
 // for a standalone deploy (e.g. GitHub Pages), where window.storage doesn't exist.
@@ -2610,6 +3525,8 @@ async function loadGame(){
     const saved = JSON.parse(raw);
     if (saved.player) Object.assign(player, saved.player);
     if (!player.discovered) player.discovered = {};
+    if (!player.quests) player.quests = [];
+    if (!player.notifications) player.notifications = [];
     if (Array.isArray(saved.caseLog)) caseLog = saved.caseLog;
     if (Array.isArray(saved.mechaCaseLog)) mechaCaseLog = saved.mechaCaseLog;
     if (Array.isArray(saved.crapCaseLog)) crapCaseLog = saved.crapCaseLog;
@@ -2630,6 +3547,8 @@ function renderAll(){
   else if (currentTab==="catalog") renderCatalog();
   else if (currentTab==="shop") renderShop();
   else if (currentTab==="casino") renderCasino();
+  else if (currentTab==="quests") renderQuests();
+  else if (currentTab==="notifications") renderNotifications();
   scheduleSave();
 }
 
