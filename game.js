@@ -186,7 +186,12 @@ const EXTRA_ITEMS = [
   {id:"last_breath_charm", name:"Оберег последнего вздоха *", tags:"Y", rarity:"precious", desc:"Не даёт умереть. Один раз. Дальше — сам как-нибудь."},
   {id:"rabbit_foot", name:"Заячья лапка *", tags:"Y", rarity:"suchself", desc:"Технически — от таракана. Но работает точно так же, говорят."},
   {id:"stasik_mushroom", name:"Гриб Стасика *", tags:"Y", rarity:"suchself", desc:"Происхождение не обсуждается. Действие — тоже, оно каждый раз разное."},
-  {id:"beadhandful", name:"Горсть бус *", tags:"X", rarity:"trash", desc:"Официальная валюта ВЦВП. Больше нигде не принимают, даже там."}
+  {id:"beadhandful", name:"Горсть бус *", tags:"X", rarity:"trash", desc:"Официальная валюта ВЦВП. Больше нигде не принимают, даже там."},
+  {id:"portal_shard", name:"Осколок портала *", tags:"C", rarity:"rare", desc:"Холодный на ощупь. Иногда шепчет что-то на языке, которого не существует."},
+  {id:"portal_key", name:"Портальный ключ *", tags:"P", rarity:"precious", desc:"Открывает проход в Туманные земли. Использовать осторожно — туман не любит, когда его тревожат зря."},
+  {id:"foglichen", name:"Туманный лишайник *", tags:"X", rarity:"normal", desc:"Растёт только там, где обычная логика не работает."},
+  {id:"witchvial", name:"Флакон Лесной Ведьмы *", tags:"S", rarity:"rare", desc:"Внутри — что-то булькающее. Ведьма забыла подписать содержимое."},
+  {id:"ancientantler", name:"Древний рог *", tags:"S", rarity:"precious", desc:"Отвалился от кого-то очень старого и очень недовольного этим фактом."}
 ];
 for (const it of EXTRA_ITEMS) ITEM_DB[it.id] = it;
 
@@ -341,7 +346,10 @@ const RECIPES = [
   {id:"r_regen_elixir", inputs:[{id:"waterchunk",qty:1},{id:"sakuraflower",qty:1}], tools:["transformbook"], output:{item:"regen_elixir", qty:1}, label:"Кусок воды + Цветок Сакуры + Магическая книга трансформации(инстр.) = Эликсир регенерации *", homebrew:true},
   {id:"r_pepper_spray", inputs:[{id:"cactusthorn",qty:1},{id:"waterchunk",qty:1}], tools:[], output:{item:"pepper_spray", qty:1}, label:"Колючка кактуса + Кусок воды = Банка перечного спрея *", homebrew:true},
   {id:"r_last_breath_charm", inputs:[{id:"weakamulet",qty:1},{id:"cloth",qty:1},{id:"rottape",qty:1}], tools:[], output:{item:"last_breath_charm", qty:1}, label:"Слабый магический амулет + Ткань + Гнилая изолента = Оберег последнего вздоха *", homebrew:true},
-  {id:"r_rabbit_foot", inputs:[{id:"roach",qty:1},{id:"grass",qty:1}], tools:[], output:{item:"rabbit_foot", qty:1}, label:"Таракан + Трава = Заячья лапка * (технически не заяц)", homebrew:true}
+  {id:"r_rabbit_foot", inputs:[{id:"roach",qty:1},{id:"grass",qty:1}], tools:[], output:{item:"rabbit_foot", qty:1}, label:"Таракан + Трава = Заячья лапка * (технически не заяц)", homebrew:true},
+
+  // ---- Farlands unlock ----
+  {id:"r_portal_key", inputs:[{id:"portal_shard",qty:2},{id:"madnessjar",qty:1}], tools:[], output:{item:"portal_key", qty:1}, label:"Осколок портала * ×2 + Безумие в банке = Портальный ключ * (открывает Туманные земли)", homebrew:true}
 ];
 
 function recipeCategory(recipe){
@@ -664,7 +672,8 @@ const DIOGEN_TRADES = [
   {id:"t3", give:{io:60}, get:{item:"barrelitem", qty:1}, label:"60 Ио → Бочка"},
   {id:"t4", give:{item:"biotrash", qty:1}, get:{io:20}, label:"Биомусор → 20 Ио"},
   {id:"t5", give:{item:"grime", qty:1}, get:{io:10}, label:"Чернь → 10 Ио"},
-  {id:"t6", give:{io:50}, get:{ar:5}, label:"50 Ио → 5 АР («не спрашивай, откуда курс»)", homebrew:true}
+  {id:"t6", give:{io:50}, get:{ar:5}, label:"50 Ио → 5 АР («не спрашивай, откуда курс»)", homebrew:true},
+  {id:"t7", give:{io:80}, get:{item:"portal_shard", qty:1}, label:"80 Ио → Осколок портала * («да, я и туда доставал»)", homebrew:true}
 ];
 
 // ===================== SEWER NARRATIVE EVENTS (Round 7) =====================
@@ -970,25 +979,451 @@ function applySewerEventEffect(key){
 
 console.log("data module ok", Object.keys(ITEM_DB).length, "items,", Object.keys(UNIT_DB).length, "units,", RECIPES.length, "recipes");
 
+// ===================== FARLANDS (Туманные земли) — second location =====================
+// Harder location, higher rewards. Unlocked by crafting "portal_key" (needs portal_shard, bought from
+// Diogen in the sewers). Routes are procedurally generated (2 tier1 + 2 tier2 + 1 tier3 + 1 boss) instead
+// of picked from a fixed list like the sewer's SEWER_ROUTES.
+const FARLANDS_MOBS = {
+  // tier 1
+  f1: {name:"Туманный заяц-провокатор", hp:11, dmg:3, shld:0},
+  f2: {name:"Мшистый пень с характером", hp:15, dmg:2, shld:1},
+  f3: {name:"Летающая шишка-камикадзе", hp:9, dmg:4, shld:0},
+  f4: {name:"Блуждающий огонёк-должник", hp:13, dmg:2, shld:1},
+  f5: {name:"Гриб-подслушиватель", hp:14, dmg:2, shld:1},
+  // tier 2
+  f6: {name:"Лесной торговец краденым туманом", hp:20, dmg:3, shld:1},
+  f7: {name:"Одичавший садовый гном-мародёр", hp:19, dmg:4, shld:1},
+  f8: {name:"Дерево со слишком многими мнениями", hp:24, dmg:2, shld:2},
+  f9: {name:"Стая туманных ворон-бухгалтеров", hp:18, dmg:3, shld:0, flag:"crowaudit", scalingDmgPerKill:1},
+  f10:{name:"Олень о восьми ногах, как минимум", hp:26, dmg:3, shld:1},
+  // tier 3
+  f11:{name:"Ходячий, подозрительно осведомлённый валежник", hp:33, dmg:4, shld:1},
+  f12:{name:"Туманная гончая о трёх головах (каждая врёт)", hp:36, dmg:5, shld:1},
+  f13:{name:"Вендиго на пенсии, но всё ещё голодный", hp:38, dmg:4, shld:2},
+  // bosses
+  fb1:{name:"Лесная Ведьма Тумана", hp:48, dmg:5, shld:2, boss:true, flag:"fogwitch"},
+  fb2:{name:"Прадед Рогов, Древний Патриарх Оленей", hp:55, dmg:5, shld:3, boss:true, flag:"antlerlord", scalingDmgPerKill:1}
+};
+
+function generateFarlandsRoute(){
+  const tier1 = ["f1","f2","f3","f4","f5"];
+  const tier2 = ["f6","f7","f8","f9","f10"];
+  const tier3 = ["f11","f12","f13"];
+  const bosses = ["fb1","fb2"];
+  function pickN(arr,n){
+    const pool = [...arr];
+    const out = [];
+    for (let i=0;i<n && pool.length;i++){
+      out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+    }
+    return out;
+  }
+  return [
+    ...pickN(tier1,2),
+    ...pickN(tier2,2),
+    ...pickN(tier3,1),
+    bosses[Math.floor(Math.random()*bosses.length)]
+  ];
+}
+
+function rollFarlandsRewards(flags, sumDmgTaken){
+  const reward = {items:{}, io:0, ar:0};
+  const miscRoll = Math.floor(Math.random()*101);
+  if (miscRoll < 50) reward.items.foglichen = (reward.items.foglichen||0)+1;
+  else if (miscRoll < 85) reward.items.foglichen = (reward.items.foglichen||0)+2;
+  else reward.items.foglichen = (reward.items.foglichen||0)+3;
+
+  let ioAmount = Math.floor(120 + Math.random()*100); // baseline 120-220 — well above sewer's 50-100
+  let arAmount = 2 + Math.floor(Math.random()*4); // baseline 2-5 АР, guaranteed (sewer rarely grants any)
+  if (flags.crowaudit){
+    if (Math.floor(Math.random()*101) > 59) reward.ar += 2;
+  }
+  if (flags.fogwitch){
+    ioAmount += 40 + Math.floor(Math.random()*40);
+    if (Math.random()<0.4) reward.items.witchvial = (reward.items.witchvial||0)+1;
+  }
+  if (flags.antlerlord){
+    ioAmount += 50;
+    arAmount += 3 + Math.floor(Math.random()*4);
+    if (Math.random()<0.3) reward.items.ancientantler = (reward.items.ancientantler||0)+1;
+  }
+  if (sumDmgTaken <= 15) ioAmount = Math.floor(ioAmount*1.3);
+  else if (sumDmgTaken > 60) ioAmount = Math.floor(ioAmount*0.85);
+  reward.io = ioAmount;
+  reward.ar = arAmount;
+  return reward;
+}
+
+// 17 narrative events, fog/forest themed. Per request, most are genuine multi-node dialogues (not just a
+// single question), and fights (when offered) favor several weaker foes over one strong one, same as the
+// Sewer events.
+const FARLANDS_EVENTS = {
+  campfire_strangers: { icon:"🔥", title:"Костёр незнакомцев", tree:{
+    start: { text:"У костра сидит компания то ли туристов, то ли местных — не разобрать в тумане. Один машет рукой, приглашая присесть.",
+      options:[
+        {label:"Присесть", next:"sit"},
+        {label:"Спросить дорогу", next:"ask_road"},
+        {label:"Обойти стороной", next:null, resultText:"Компания провожает вас взглядом и возвращается к костру."}
+      ]},
+    sit: { text:"Вам наливают что-то мутное во флягу и продолжают травить байки, будто вы тут сто лет сидите.",
+      options:[
+        {label:"Выпить", effect:"campfire_drink", next:null},
+        {label:"Просто послушать байки", effect:"campfire_listen", next:null}
+      ]},
+    ask_road: { text:"Один из них долго и уверенно чертит палкой на земле маршрут. Маршрут явно ведёт в озеро.",
+      options:[
+        {label:"Поблагодарить и уйти своим путём", effect:"campfire_thank", next:null},
+        {label:"Указать на ошибку", effect:"campfire_correct", next:null}
+      ]}
+  }},
+  owl_examiner: { icon:"🦉", title:"Сова-экзаменатор", tree:{
+    start: { text:"Огромная сова в потрёпанной академической мантии восседает на пне и требует «устный экзамен по туманологии».",
+      options:[
+        {label:"Сдавать экзамен", next:"q1"},
+        {label:"Отказаться", next:null, resultText:"Сова разочарованно ставит воображаемый «неуд» в воображаемую ведомость и улетает."}
+      ]},
+    q1: { text:"Сова: «Первый вопрос. Сколько тумана нужно, чтобы окончательно заблудиться?»",
+      options:[
+        {label:"«Ровно столько, сколько уже есть»", effect:"owl_answer_zen", next:null},
+        {label:"«Смотря, насколько вы уже потерялись»", effect:"owl_answer_clever", next:null},
+        {label:"«Понятия не имею»", effect:"owl_answer_honest", next:null}
+      ]}
+  }},
+  toadstool_ring: { icon:"🍄", title:"Кольцо мухоморов", tree:{
+    start: { text:"На поляне — идеально ровное кольцо из мухоморов. Наступить в него почему-то очень хочется, и это само по себе подозрительно.",
+      options:[
+        {label:"Наступить в кольцо", next:"inside"},
+        {label:"Обойти по краю", next:null, resultText:"Кольцо будто разочарованно тускнеет за спиной."}
+      ]},
+    inside: { text:"Голоса из-под земли требуют представиться «по всем правилам лесного этикета», о которых вы, разумеется, не слышали.",
+      options:[
+        {label:"Представиться вежливо и обстоятельно", effect:"toadstool_polite", next:null},
+        {label:"Буркнуть имя и попытаться выйти", effect:"toadstool_rude", next:null}
+      ]}
+  }},
+  lost_photographer: { icon:"📷", title:"Заблудившийся турист-фотограф", tree:{
+    start: { text:"Турист с тремя камерами на шее умоляет помочь ему поймать «настоящий кадр первозданного тумана».",
+      options:[
+        {label:"Позировать самому", effect:"photographer_pose", next:null},
+        {label:"Посоветовать место получше", next:"hint"},
+        {label:"Уйти", next:null, resultText:"Турист еще долго кричит вслед что-то про освещение."}
+      ]},
+    hint: { text:"Вы указываете на подозрительно живописную прогалину. Турист в восторге убегает туда с камерами наперевес.",
+      options:[
+        {label:"Подождать, чем это кончится", effect:"photographer_hint", next:null}
+      ]}
+  }},
+  walking_hut: { icon:"🏚️", title:"Ведьмин домик на курьих ножках", tree:{
+    start: { text:"Избушка на курьих ножках сама подходит к вам и вежливо стучится в собственную дверь, будто приглашая войти.",
+      options:[
+        {label:"Постучать в ответ", next:"knock"},
+        {label:"Отойти подальше", next:null, resultText:"Избушка обиженно разворачивается и уходит, переваливаясь на ножках."}
+      ]},
+    knock: { text:"Дверь приоткрывается. Изнутри выглядывает ведьма: «Ночлег — не бесплатно. Чем расплатишься?»",
+      options:[
+        {label:"Заплатить Ио", effect:"hut_pay", next:null},
+        {label:"Предложить обмен предметом", effect:"hut_trade", next:null},
+        {label:"Передумать", next:null, resultText:"Ведьма пожимает плечами и захлопывает дверь. Избушка обиженно топает прочь."}
+      ]}
+  }},
+  echo_answers_first: { icon:"🌫️", title:"Эхо, которое отвечает раньше вопроса", tree:{
+    start: { text:"В тумане раздаётся эхо вашего голоса — вот только вы ещё ничего не сказали.",
+      options:[
+        {label:"Всё равно задать вопрос вслух", next:"asked"},
+        {label:"Промолчать из принципа", next:null, resultText:"Эхо ждёт секунд десять, вздыхает эхом же и стихает."}
+      ]},
+    asked: { text:"Эхо уже прокричало ответ секундой раньше — что-то невнятное о «третьей тропе слева». Верить ли?",
+      options:[
+        {label:"Довериться эху", effect:"echo_believe", next:null},
+        {label:"Усомниться", effect:"echo_doubt", next:null}
+      ]}
+  }},
+  wolf_philosophers: { icon:"🐺", title:"Стая волков-философов", tree:{
+    start: { text:"Стая волков перегородила тропу и увлечённо спорит о природе свободы воли, полностью игнорируя вас.",
+      options:[
+        {label:"Вступить в спор", next:"debate"},
+        {label:"⚔ Разогнать спор силой", fight:[{name:"Волк-спорщик *",hp:12,dmg:3,shld:1},{name:"Волк-спорщик *",hp:12,dmg:3,shld:1},{name:"Волк-спорщик *",hp:12,dmg:3,shld:1}]},
+        {label:"Тихо обойти по краю поляны", effect:"wolf_sneak", next:null}
+      ]},
+    debate: { text:"Вожак стаи скептически щурится: «А ты вообще выбрал прийти сюда — или тебя заставили обстоятельства?»",
+      options:[
+        {label:"«Конечно выбрал, я свободен»", effect:"wolf_debate_free", next:null},
+        {label:"«Меня буквально заставил сюжет игры»", effect:"wolf_debate_meta", next:null}
+      ]}
+  }},
+  stump_job_posting: { icon:"📌", title:"Пень с вакансией", tree:{
+    start: { text:"К пню гвоздём прибито объявление: «ТРЕБУЕТСЯ ГЕРОЙ. Опыт не важен. Оплата туманом. Собеседование прямо тут».",
+      options:[
+        {label:"Откликнуться на вакансию", next:"interview"},
+        {label:"Пройти мимо", next:null, resultText:"Объявление уныло шелестит на ветру."}
+      ]},
+    interview: { text:"Из-за пня высовывается нечто административное на вид и спрашивает: «Ваша главная слабость?»",
+      options:[
+        {label:"«Честность»", effect:"stump_answer_honest", next:null},
+        {label:"«Раньше был мухомором»", effect:"stump_answer_weird", next:null}
+      ]}
+  }},
+  dead_hiker_ghost: { icon:"👻", title:"Мёртвый турист, который просто хочет поболтать", tree:{
+    start: { text:"На поваленном бревне сидит полупрозрачный турист в анораке. Выглядит на удивление умиротворённо для покойника.",
+      options:[
+        {label:"Поболтать", next:"chat"},
+        {label:"Уйти по-тихому", next:null, resultText:"Призрак машет вслед. Судя по всему, он привык."}
+      ]},
+    chat: { text:"Призрак охотно рассказывает, как заблудился здесь ещё в прошлом веке, и что «тут на самом деле неплохо, если привыкнуть».",
+      options:[
+        {label:"Спросить, не оставил ли он вещей", effect:"ghost_chat_reward", next:null},
+        {label:"Просто пожелать хорошего отдыха", next:null, resultText:"Призрак растроганно растворяется в тумане, явно польщённый."}
+      ]}
+  }},
+  fog_mail: { icon:"✉️", title:"Туманная почта", tree:{
+    start: { text:"Из тумана выходит курьер без лица и вручает конверт с адресом «Любому живому существу в радиусе видимости».",
+      options:[
+        {label:"Открыть письмо", effect:"mail_open", next:null},
+        {label:"Отказаться принимать", next:null, resultText:"Курьер обиженно уходит обратно в туман вместе с письмом."}
+      ]}
+  }},
+  fake_shaman: { icon:"🪘", title:"Деревенский шаман не из этой деревни", tree:{
+    start: { text:"Человек в перьях уверяет, что он «шаман из соседней деревни» — хотя ближайшая деревня в трёх днях пути.",
+      options:[
+        {label:"Согласиться на ритуал", next:"ritual"},
+        {label:"Отказаться", next:null, resultText:"«Шаман» пожимает плечами и уходит собирать перья дальше."}
+      ]},
+    ritual: { text:"Ритуал сопровождается странным барабанным боем и запахом палёных перьев. Что-то явно происходит.",
+      options:[
+        {label:"Довести ритуал до конца", effect:"shaman_ritual", next:null}
+      ]}
+  }},
+  tourist_trap: { icon:"🪤", title:"Ловушка для туристов от туристов", tree:{
+    start: { text:"На тропе — очевидная ловушка с табличкой «ЭТО НЕ ЛОВУШКА ДЛЯ ТУРИСТОВ», что уже само по себе подозрительно.",
+      options:[
+        {label:"Попытаться обезвредить", next:"disarm"},
+        {label:"Аккуратно обойти", next:null, resultText:"Ловушка щёлкает вхолостую где-то позади. Кому-то не повезёт."},
+        {label:"⚔ Подождать в засаде того, кто её поставил", fight:[{name:"Турист-ловец *",hp:16,dmg:4,shld:0},{name:"Турист-ловец *",hp:16,dmg:4,shld:0}]}
+      ]},
+    disarm: { text:"Механизм оказывается неожиданно сложным — явно чей-то дипломный проект.",
+      options:[
+        {label:"Довести дело до конца", effect:"trap_disarm", next:null}
+      ]}
+  }},
+  moss_choir: { icon:"🎶", title:"Хор мхов", tree:{
+    start: { text:"Целая поляна мха синхронно колышется и издаёт на удивление стройное многоголосое гудение.",
+      options:[
+        {label:"Подпевать", effect:"moss_singalong", next:null},
+        {label:"Слушать молча", effect:"moss_listen", next:null}
+      ]}
+  }},
+  mushroom_lawyer: { icon:"🍄‍🟫", title:"Разговорчивый гриб-юрист", tree:{
+    start: { text:"Гриб в крошечном галстуке раскладывает перед вами свиток мелким текстом: «Контракт на проход через данный участок леса».",
+      options:[
+        {label:"Подписать не глядя", effect:"lawyer_sign_blind", next:null},
+        {label:"Прочитать мелкий шрифт", next:"finePrint"},
+        {label:"Отказаться от сделки", next:null, resultText:"Гриб оскорблённо сворачивает свиток и что-то бормочет про «упущенную выгоду»."}
+      ]},
+    finePrint: { text:"Мелкий шрифт гласит: «Клиент обязуется по первому требованию рассказать грибу что-нибудь интересное».",
+      options:[
+        {label:"Согласиться на таких условиях", effect:"lawyer_read_finePrint", next:null},
+        {label:"Всё равно отказаться", next:null, resultText:"«Ваше право», — вздыхает гриб и сворачивает контракт."}
+      ]}
+  }},
+  one_man_patrol: { icon:"🎖️", title:"Патруль лесной стражи из одного человека", tree:{
+    start: { text:"Человек с самодельным значком «Лесная Стража» требует уплаты «лесного налога за проход по территории».",
+      options:[
+        {label:"Заплатить", effect:"patrol_pay", next:null},
+        {label:"Поспорить о законности налога", next:"argue"},
+        {label:"⚔ Прорваться силой", fight:[{name:"Лесной страж *",hp:20,dmg:4,shld:1},{name:"Лесной страж-стажёр *",hp:14,dmg:3,shld:0}]}
+      ]},
+    argue: { text:"Страж достаёт мятую бумажку с печатью, которую явно нарисовал сам, и тычет в неё пальцем.",
+      options:[
+        {label:"Указать на поддельность печати", effect:"patrol_argue", next:null}
+      ]}
+  }},
+  fortune_machine: { icon:"🔮", title:"Древний автомат с гаданиями", tree:{
+    start: { text:"Посреди леса, непонятно на чём работая, стоит древний автомат-гадалка с треснувшей табличкой «УЗНАЙ СУДЬБУ».",
+      options:[
+        {label:"Бросить монетку (10 Ио)", effect:"fortune_coin", next:null},
+        {label:"Пнуть автомат", effect:"fortune_kick", next:null},
+        {label:"Пройти мимо", next:null, resultText:"Автомат разочарованно мигает лампочками вслед."}
+      ]}
+  }},
+  cultist_tourists: { icon:"🥾", title:"Культисты в поисках «настоящего тумана»", tree:{
+    start: { text:"Группа туристов в одинаковых балахонах убеждена, что где-то здесь есть «Настоящий Туман», и требует у вас указать дорогу.",
+      options:[
+        {label:"Указать заведомо неверный путь", effect:"cultist_wrongway", next:null},
+        {label:"⚔ Разогнать", fight:[{name:"Турист-культист *",hp:11,dmg:3,shld:0},{name:"Турист-культист *",hp:11,dmg:3,shld:0},{name:"Турист-культист *",hp:11,dmg:3,shld:0}]},
+        {label:"Присоединиться к поискам", next:"join"}
+      ]},
+    join: { text:"Вы бродите с культистами кругами час, прежде чем понимаете, что «настоящий туман» — это, по их теории, просто более густой туман.",
+      options:[
+        {label:"Разочароваться и уйти", effect:"cultist_join", next:null}
+      ]}
+  }}
+};
+
+function applyFarlandsEventEffect(key){
+  switch(key){
+    case "campfire_drink": {
+      const alive = player.units.filter(u=>!u.dead);
+      if (!alive.length) return "Пить не с кем разделить компанию — отряд пуст. Вы выпиваете в одиночестве и жалеете об этом.";
+      const unit = alive[Math.floor(Math.random()*alive.length)];
+      if (Math.random()<0.5){ const h=5+Math.floor(Math.random()*6); unit.maxHp+=h; unit.hp=Math.min(unit.maxHp,unit.hp+h); return "Напиток странно бодрит "+unit.name+" — +"+h+" HP."; }
+      unit.dmg = Math.max(0, unit.dmg-1);
+      return unit.name+" наутро (то есть сразу же) чувствует себя неважно — -1 к урону.";
+    }
+    case "campfire_listen": { const amt=15+Math.floor(Math.random()*16); player.io+=amt; return "Одна из баек оказывается неожиданно полезной наводкой на нычку — вы находите "+amt+" Ио."; }
+    case "campfire_thank": { return "Вы вежливо благодарите и идёте в противоположном направлении от озера. Мудрое решение."; }
+    case "campfire_correct": {
+      if (Math.random()<0.5){ player.io+=20; return "Компания смущённо признаёт ошибку и в качестве извинения скидывается — 20 Ио."; }
+      return "Компания обижается на критику и демонстративно перестаёт с вами разговаривать.";
+    }
+    case "owl_answer_zen": { addItem("foglichen",2); return "Сова одобрительно ухает: «Дзен-ответ. Похвально». Роняет пару лишайников с ветки."; }
+    case "owl_answer_clever": { const amt=15+Math.floor(Math.random()*15); player.io+=amt; return "Сова признаёт ответ «формально верным» и выдаёт "+amt+" Ио «за находчивость»."; }
+    case "owl_answer_honest": { player.io+=10; return "Сова уважает честность больше, чем неправильные попытки, и выдаёт утешительные 10 Ио."; }
+    case "toadstool_polite": {
+      if (Math.random()<0.5){ addItem("foglichen",2); return "Голоса довольны церемонией и выпускают вас, осыпав лишайником на память."; }
+      return "Голоса долго обсуждают, достаточно ли вежливым было представление, и в итоге просто теряют интерес.";
+    }
+    case "toadstool_rude": {
+      const loss=10+Math.floor(Math.random()*15); spendIo(loss);
+      return "Голоса оскорблены до глубины своих (не)душ и забирают "+loss+" Ио «за нарушение протокола»."; 
+    }
+    case "photographer_pose": { const amt=10+Math.floor(Math.random()*10); player.io+=amt; return "Турист в восторге от кадра и суёт "+amt+" Ио «на память о съёмке»."; }
+    case "photographer_hint": {
+      if (Math.random()<0.4){ const amt=20+Math.floor(Math.random()*20); player.io+=amt; return "Турист с криком «ШЕДЕВР!» скрывается в тумане, а на земле остаётся оброненный кошелёк — "+amt+" Ио."; }
+      return "Через десять минут откуда-то издалека доносится всплеск. Кадр, вероятно, того стоил.";
+    }
+    case "hut_pay": {
+      const cost=25;
+      if (!canAffordIo(cost)) return "Ведьма щурится: «Ио маловато, дружок». Дверь захлопывается.";
+      spendIo(cost); addItem("witchvial",1);
+      return "Ведьма впускает переночевать и на посошок суёт непонятный флакон.";
+    }
+    case "hut_trade": {
+      if (!hasItem("foglichen",2)) return "Ведьма принюхивается: «Лишайника маловато, не сойдёт за оплату».";
+      removeItem("foglichen",2); addItem("regen_elixir",1);
+      return "Ведьма одобрительно кивает, забирает лишайник и взамен сует Эликсир регенерации.";
+    }
+    case "echo_believe": {
+      if (Math.random()<0.5){ const amt=20+Math.floor(Math.random()*20); player.io+=amt; return "Тропа выводит точно к тайнику. Эхо не соврало — "+amt+" Ио."; }
+      const loss=10+Math.floor(Math.random()*10); spendIo(loss);
+      return "Тропа выводит точно к обрыву. Пришлось обходить, потеряв по пути "+loss+" Ио из кармана.";
+    }
+    case "echo_doubt": { return "Вы идёте своим путём. Эхо ещё долго обиженно повторяет забытый ответ вслед."; }
+    case "wolf_sneak": {
+      if (Math.random()<0.6) return "Спор настолько увлекателен, что волки даже не замечают, как вы прошли мимо.";
+      const loss=8+Math.floor(Math.random()*10); spendIo(loss);
+      return "Один из волков всё же оборачивается и в качестве «штрафа за отвлечение» рычит так, что вы роняете "+loss+" Ио.";
+    }
+    case "wolf_debate_free": { const amt=15+Math.floor(Math.random()*15); player.io+=amt; return "Стая уважительно расступается перед таким уверенным экзистенциалистом и даже скидывается — "+amt+" Ио."; }
+    case "wolf_debate_meta": { const amt=25+Math.floor(Math.random()*20); player.io+=amt; return "Волки в восторге от мета-ответа и воют одобрительным хором, роняя из шерсти "+amt+" Ио — не спрашивайте, как."; }
+    case "stump_answer_honest": { player.io+=15; return "«Административное нечто» удовлетворённо шуршит бумагами и выдаёт 15 Ио «подъёмных»."; }
+    case "stump_answer_weird": { addItem("foglichen",3); return "«Административное нечто» проникается профессиональной солидарностью бывшего гриба и отсыпает лишайника."; }
+    case "ghost_chat_reward": { const amt=20+Math.floor(Math.random()*25); player.io+=amt; return "Призрак вспоминает, где закопал заначку, и с удовольствием указывает место — "+amt+" Ио."; }
+    case "mail_open": {
+      const roll=Math.random();
+      if (roll<0.4){ const amt=20+Math.floor(Math.random()*25); player.io+=amt; return "В конверте — чек на "+amt+" Ио неизвестно от кого. Похоже на ошибку доставки в вашу пользу."; }
+      if (roll<0.7){ addItem("foglichen",2); return "В конверте — образцы лишайника с пометкой «на удачу»."; }
+      return "В конверте — рекламная листовка туманной страховой компании. Разочаровывающе обыденно.";
+    }
+    case "shaman_ritual": {
+      const alive = player.units.filter(u=>!u.dead);
+      if (!alive.length) return "Ритуал заканчивается ничем — благословлять некого, отряд пуст.";
+      const unit = alive[Math.floor(Math.random()*alive.length)];
+      if (Math.random()<0.5){ unit.dmg+=2; return "Ритуал неожиданно срабатывает — "+unit.name+" светится боевым духом, +2 к урону."; }
+      unit.shld=(unit.shld||0)+1;
+      return "Ритуал срабатывает как-то не так, но в целом полезно — "+unit.name+" покрывается странной коркой, +1 к защите.";
+    }
+    case "trap_disarm": {
+      if (Math.random()<0.5){ addItem("wires",3); return "Ловушка обезврежена и разобрана на детали — пригодятся провода."; }
+      const loss=10+Math.floor(Math.random()*10); spendIo(loss);
+      return "Ловушка внезапно срабатывает вам по ноге. Обидно и на "+loss+" Ио дороже, чем ожидалось (аптечка).";
+    }
+    case "moss_singalong": {
+      const alive = player.units.filter(u=>!u.dead);
+      if (!alive.length) return "Подпевать некому — отряд пуст, а соло вы не тянете.";
+      const unit = alive[Math.floor(Math.random()*alive.length)];
+      const h=6+Math.floor(Math.random()*7); unit.maxHp+=h; unit.hp=Math.min(unit.maxHp,unit.hp+h);
+      return "Хор мхов странно резонирует с "+unit.name+" — +"+h+" HP.";
+    }
+    case "moss_listen": { player.io+=10; return "Мох гудит что-то вроде колыбельной. Под ней на земле обнаруживается 10 Ио — видимо, чьи-то потерянные."; }
+    case "lawyer_sign_blind": {
+      const roll=Math.random();
+      if (roll<0.4){ addItem("madnessjar",1); return "Контракт оказывается на редкость выгодным — гриб в шоке от собственной щедрости и всучивает банку «Безумия» бонусом."; }
+      const loss=15+Math.floor(Math.random()*15); spendIo(loss);
+      return "Контракт, как выясняется постфактум, обязывал вас доплатить «за консультацию». Гриб-юрист безжалостно взыскивает "+loss+" Ио.";
+    }
+    case "lawyer_read_finePrint": {
+      const amt=15+Math.floor(Math.random()*15); player.io+=amt;
+      return "Вы рассказываете грибу байку про Мартына и его лавку. Гриб в восторге и выплачивает гонорар "+amt+" Ио.";
+    }
+    case "patrol_pay": {
+      const cost=20;
+      if (!canAffordIo(cost)) return "Страж качает головой: «Без уплаты налога прохода нет. А платить, я смотрю, нечем».";
+      spendIo(cost);
+      return "Страж выдаёт вам мятую квитанцию с печатью и машет рукой в сторону тумана.";
+    }
+    case "patrol_argue": {
+      if (Math.random()<0.5){ return "Страж смущённо признаёт, что печать он и правда нарисовал сам, и пропускает вас бесплатно."; }
+      const loss=8+Math.floor(Math.random()*8); spendIo(loss);
+      return "Страж оскорблён сомнением в подлинности печати и штрафует ещё сильнее — минус "+loss+" Ио.";
+    }
+    case "fortune_coin": {
+      const cost=10;
+      if (!canAffordIo(cost)) return "Автомат мигает «НЕДОСТАТОЧНО ИО» и гаснет.";
+      spendIo(cost);
+      if (Math.random()<0.4){ const amt=25+Math.floor(Math.random()*25); player.io+=amt; return "Автомат выплёвывает карточку «ТЕБЯ ЖДЁТ БОГАТСТВО» и, кажется, сам его материализует — "+amt+" Ио."; }
+      return "Автомат выдаёт карточку «ТЕБЯ ЖДЁТ ТУМАН». Пророчество исполняется немедленно и буднично.";
+    }
+    case "fortune_kick": {
+      if (Math.random()<0.3){ player.ar+=2; return "От удара из автомата высыпаются пара забытых жетонов — превращаются в 2 АР, не спрашивайте, как."; }
+      return "Автомат просто грустно мигает. Он и так не просил, чтобы его тут ставили.";
+    }
+    case "cultist_wrongway": {
+      const amt=15+Math.floor(Math.random()*15); player.io+=amt;
+      return "Культисты с благодарностью уходят в противоположную сторону, оставив «пожертвование Туману» — "+amt+" Ио — прямо на тропе.";
+    }
+    case "cultist_join": { addItem("foglichen",2); return "На прощание культисты вручают вам «сертифицированный образец недостаточно настоящего тумана» — то есть просто лишайник."; }
+    default: return "";
+  }
+}
+
+// Combined lookup across both locations' mob tables — mobKey namespaces don't collide (sewer keys are
+// plain numbers, Farlands keys are "f"-prefixed strings), so a single merged table keeps makeEnemyInstance
+// and friends location-agnostic.
+const ALL_MOBS = Object.assign({}, SEWER_MOBS, FARLANDS_MOBS);
+
+function currentEventTable(){
+  return (expedition && expedition.locationId === "farlands") ? FARLANDS_EVENTS : SEWER_EVENTS;
+}
+function currentEventEffectFn(){
+  return (expedition && expedition.locationId === "farlands") ? applyFarlandsEventEffect : applySewerEventEffect;
+}
+const LOCATION_EVENT_CHANCE = { sewer: 0.25, farlands: 0.28 };
+
 // ===================== QUEST TEMPLATES =====================
-// Simple fetch-quest template: bring `qty` of `itemId`, get Ио reward in [min,max]. Deliberately
-// bare-bones for now (per request) — a placeholder loop to build more interesting quest types on later.
+// Simple fetch-quest template: bring qtyMin-qtyMax of `itemId`, get a reward — mostly Ио (30-80), sometimes
+// a smaller АР payout (6-15) instead. Deliberately bare-bones for now — a placeholder loop to build more
+// interesting quest types on later.
 const QUEST_TEMPLATES = [
-  {itemId:"wires", qty:4, min:15, max:25, text:"Кто-то очень хочет получить 4 куска проводов. Не уточняется, кто и зачем — просто оставь их на видном месте."},
-  {itemId:"grime", qty:6, min:12, max:20, text:"Мартын клянётся, что почистит лавку, если натащишь ему как следует черни."},
-  {itemId:"biotrash", qty:3, min:20, max:32, text:"В канализации кто-то собирает биомусор для «личных целей». Спрашивать не рекомендуется."},
-  {itemId:"cloth", qty:5, min:15, max:24, text:"Нужна ткань. Много ткани. Что именно из неё шьют — государственная тайна."},
-  {itemId:"stone", qty:8, min:10, max:18, text:"Кто-то строит из камней нечто. Пока непонятно что, но камни нужны регулярно."},
-  {itemId:"potato", qty:6, min:14, max:22, text:"Картофельный дефицит. Официально — нет. Неофициально — принеси картошки."},
-  {itemId:"brick", qty:5, min:16, max:26, text:"Требуются кирпичи для укрепления чего-то, что укреплять явно поздно."}
+  {itemId:"wires", qtyMin:2, qtyMax:4, text:"Кто-то очень хочет получить пару кусков проводов. Не уточняется, кто и зачем — просто оставь их на видном месте."},
+  {itemId:"grime", qtyMin:2, qtyMax:4, text:"Мартын клянётся, что почистит лавку, если натащишь ему как следует черни."},
+  {itemId:"biotrash", qtyMin:2, qtyMax:3, text:"В канализации кто-то собирает биомусор для «личных целей». Спрашивать не рекомендуется."},
+  {itemId:"cloth", qtyMin:2, qtyMax:4, text:"Нужна ткань. Не очень много, но настоящая. Что именно из неё шьют — государственная тайна."},
+  {itemId:"stone", qtyMin:2, qtyMax:4, text:"Кто-то строит из камней нечто. Пока непонятно что, но пара камней бы не помешала."},
+  {itemId:"potato", qtyMin:2, qtyMax:4, text:"Картофельный дефицит. Официально — нет. Неофициально — принеси немного картошки."},
+  {itemId:"brick", qtyMin:2, qtyMax:4, text:"Требуется пара кирпичей для укрепления чего-то, что укреплять явно поздно."}
 ];
 var questIdCounter = 1;
 function makeQuestFromTemplate(t, textOverride){
+  const qty = t.qtyMin + Math.floor(Math.random()*(t.qtyMax-t.qtyMin+1));
+  const isAr = Math.random() < 0.25;
+  const rewardType = isAr ? "ar" : "io";
+  const rewardAmount = isAr ? (6+Math.floor(Math.random()*10)) : (30+Math.floor(Math.random()*51)); // ar 6-15, io 30-80
   return {
     id: "q"+(questIdCounter++),
     itemId: t.itemId,
-    qty: t.qty,
-    rewardIo: t.min + Math.floor(Math.random()*(t.max-t.min+1)),
+    qty,
+    rewardType,
+    rewardAmount,
     text: textOverride || t.text
   };
 }
@@ -1006,10 +1441,10 @@ function claimQuest(qid){
   if (!q) return {ok:false, msg:"Квест не найден."};
   if (!hasItem(q.itemId, q.qty)) return {ok:false, msg:"Не хватает предметов для сдачи."};
   removeItem(q.itemId, q.qty);
-  player.io += q.rewardIo;
+  if (q.rewardType==="ar") player.ar += q.rewardAmount; else player.io += q.rewardAmount;
   player.quests = player.quests.filter(x=>x.id!==qid);
   ensureQuests();
-  return {ok:true, msg:`Квест сдан! +${q.rewardIo} Ио.`};
+  return {ok:true, msg:`Квест сдан! +${q.rewardAmount} ${q.rewardType==="ar"?"АР":"Ио"}.`};
 }
 
 // ===================== NOTIFICATIONS (random calls) =====================
@@ -1196,7 +1631,7 @@ function makeUnitInstance(unitId){
 }
 
 function makeEnemyInstance(mobKey){
-  const base = SEWER_MOBS[mobKey];
+  const base = ALL_MOBS[mobKey];
   return {
     uid: nextUid(),
     unitId: "mob_"+mobKey,
@@ -1215,14 +1650,15 @@ function makeEnemyInstance(mobKey){
 }
 
 var player = {
-  io: 120,
-  ar: 0,
+  io: 300,
+  ar: 20,
   inventory: {}, // itemId -> count
   units: [],     // array of unit instances (roster, not deployed)
   discovered: {}, // itemId -> true, for the Каталог tab
   lastArDay: null,
   quests: [],       // active fetch-quests, see QUEST_TEMPLATES
-  notifications: [] // pending "phone call" notifications, see NOTIF_TYPES
+  notifications: [], // pending "phone call" notifications, see NOTIF_TYPES
+  settings: { mimicsEnabled: true }
 };
 
 function addItem(id, qty){
@@ -1246,8 +1682,8 @@ function hasLuckCharm(){
   return player.units.some(u => !u.dead && u.abilities.some(a=>a.type==="luck_charm"));
 }
 
-// TESTING TOGGLE: set to false to restore normal Ио spending once testing is done.
-var TESTING_INFINITE_IO = true;
+// Testing toggle is now OFF by default — Ио spending is real. Flip to true only for local debugging.
+var TESTING_INFINITE_IO = false;
 function canAffordIo(amount){ return TESTING_INFINITE_IO || player.io >= amount; }
 function spendIo(amount){ if (!TESTING_INFINITE_IO) player.io -= amount; }
 function canAffordAr(amount){ return player.ar >= amount; }
@@ -1258,15 +1694,18 @@ function openBigCase(){
   let roll = Math.floor(Math.random()*101); // 0..100
   if (hasLuckCharm()) roll = Math.min(100, roll + 3);
   let rarity;
-  if (roll <= 24) rarity = "trash";
-  else if (roll <= 45) rarity = "suchself";
-  else if (roll <= 64) rarity = "normal";
-  else if (roll <= 79) rarity = "rare";
-  else if (roll <= 89) rarity = "precious";
-  else if (roll <= 95) rarity = "legendary";
-  else if (roll <= 98) rarity = "artifact";
+  if (roll <= 27) rarity = "trash";
+  else if (roll <= 52) rarity = "suchself";
+  else if (roll <= 73) rarity = "normal";
+  else if (roll <= 87) rarity = "rare";
+  else if (roll <= 95) rarity = "precious";
+  else if (roll <= 97) rarity = "legendary";
+  else if (roll === 98) rarity = "artifact";
   else if (roll === 99) rarity = "inonecopy";
-  else return {mimic:true};
+  else {
+    if (!player.settings || player.settings.mimicsEnabled !== false) return {mimic:true};
+    rarity = "inonecopy"; // mimics disabled in settings — this slot just becomes another in-one-copy roll
+  }
   const pool = BIG_CASE_POOL[rarity];
   const drop = pool[Math.floor(Math.random()*pool.length)];
   addItem(drop.id, 1);
@@ -1276,10 +1715,10 @@ function openBigCase(){
 function openMechaCase(){
   const roll = Math.floor(Math.random()*101);
   let rarity;
-  if (roll <= 39) rarity = "trash";
-  else if (roll <= 69) rarity = "normal";
-  else if (roll <= 88) rarity = "rare";
-  else if (roll <= 97) rarity = "precious";
+  if (roll <= 44) rarity = "trash";
+  else if (roll <= 82) rarity = "normal";
+  else if (roll <= 93) rarity = "rare";
+  else if (roll <= 98) rarity = "precious";
   else rarity = "legendary";
   const pool = MECHA_CASE_POOL[rarity];
   const drop = pool[Math.floor(Math.random()*pool.length)];
@@ -1418,23 +1857,34 @@ function undeployUnit(line, slotIndex){
   return true;
 }
 
+function resetMoveFlags(){
+  for (const u of battle.player.front) if (u) u.movedThisTurn = false;
+  for (const u of battle.player.back) if (u) u.movedThisTurn = false;
+}
+
 function beginRounds(){
   if (battle.phase !== "setup") return false;
   if (aliveList(battle.player.front).length===0 && aliveList(battle.player.back).length===0) return false;
   battle.phase = "playerTurn";
+  resetMoveFlags();
   logMsg("Битва начинается!");
   return true;
 }
 
-// movement during playerTurn: swap two slots (can be adjacent-left/right within a line, or front<->back same column)
+// movement during playerTurn: swap two slots (can be adjacent-left/right within a line, or front<->back same column).
+// Each unit gets one move per turn — but a unit that already used its move can still be swapped INTO by a
+// different unit that hasn't moved yet (it's just being displaced, not spending its own move budget).
 function moveUnit(fromLine, fromIdx, toLine, toIdx){
   if (battle.phase !== "playerTurn") return false;
   const fromArr = fromLine==="front"?battle.player.front:battle.player.back;
   const toArr = toLine==="front"?battle.player.front:battle.player.back;
-  if (!fromArr[fromIdx]) return false;
+  const movingUnit = fromArr[fromIdx];
+  if (!movingUnit) return false;
+  if (movingUnit.movedThisTurn) return false;
   const tmp = toArr[toIdx];
-  toArr[toIdx] = fromArr[fromIdx];
+  toArr[toIdx] = movingUnit;
   fromArr[fromIdx] = tmp;
+  movingUnit.movedThisTurn = true;
   // a column change invalidates any locked-in target — it'll re-default (random valid) next resolution
   if (toArr[toIdx]) { toArr[toIdx].targetLine = null; toArr[toIdx].targetIdx = null; }
   if (fromArr[fromIdx]) { fromArr[fromIdx].targetLine = null; fromArr[fromIdx].targetIdx = null; }
@@ -1686,6 +2136,7 @@ function resolveEnemyAttack(){
     return;
   }
   battle.phase = "playerTurn";
+  resetMoveFlags();
 }
 
 function endBattle(victory, stalemate){
@@ -1791,11 +2242,43 @@ function sellItem(itemId, qty){
   return {ok:true, total, sellQty, line};
 }
 
+const AR_TO_IO_RATE = 5;
+function exchangeArForIo(arAmount){
+  arAmount = Math.max(0, Math.floor(arAmount||0));
+  if (arAmount <= 0 || player.ar < arAmount) return {ok:false, msg:"Не хватает АР на обмен."};
+  player.ar -= arAmount;
+  const ioGained = arAmount * AR_TO_IO_RATE;
+  player.io += ioGained;
+  const line = MARTYN_LINES[Math.floor(Math.random()*MARTYN_LINES.length)];
+  return {ok:true, ioGained, arSpent:arAmount, line};
+}
+
 // Uncle Steyn — emergency backup when the roster hits zero units.
 function callUncleSteyn(){
   const amount = 10 + Math.floor(Math.random()*11); // 10-20 inclusive
   player.freeCases += amount;
   return amount;
+}
+
+// Uncle Steyn — money bailout for when the player is broke AND has an empty roster (can't even fight
+// their way back). He scolds you and takes your 5 highest-value items (by sell price) in exchange for cash.
+function callUncleSteynMoneyBailout(){
+  const entries = Object.entries(player.inventory)
+    .filter(([id,qty])=> ITEM_DB[id] && qty>0)
+    .map(([id,qty])=>({id, qty, price: SELL_PRICE[ITEM_DB[id].rarity]||0}))
+    .sort((a,b)=> b.price - a.price);
+  const taken = [];
+  let remaining = 5;
+  for (const e of entries){
+    if (remaining<=0) break;
+    const take = Math.min(e.qty, remaining);
+    removeItem(e.id, take);
+    taken.push({id:e.id, qty:take});
+    remaining -= take;
+  }
+  const bailout = 80 + Math.floor(Math.random()*41); // 80-120
+  player.io += bailout;
+  return { taken, bailout };
 }
 
 // ===================== MECHA ASSEMBLY (Мастерская) =====================
@@ -1932,11 +2415,12 @@ console.log("engine module ok");
 
 // ===================== EXPEDITION CONTROLLER =====================
 
-var expedition = null; // {route:[mobKeys], nodeIndex, flags:{}, sumDmg, active}
+var expedition = null; // {locationId, route:[mobKeys], nodeIndex, flags:{}, sumDmg, active}
 
-function startExpedition(){
-  const route = SEWER_ROUTES[Math.floor(Math.random()*SEWER_ROUTES.length)];
-  expedition = { route, nodeIndex: 0, flags:{}, sumDmg:0, active:true, tradeShown:false };
+function startExpedition(locationId){
+  locationId = locationId || "sewer";
+  const route = locationId==="farlands" ? generateFarlandsRoute() : SEWER_ROUTES[Math.floor(Math.random()*SEWER_ROUTES.length)];
+  expedition = { locationId, route, nodeIndex: 0, flags:{}, sumDmg:0, active:true, tradeShown:false };
   return expedition;
 }
 
@@ -1947,13 +2431,14 @@ function currentExpeditionMob(){
 
 function advanceExpeditionAfterVictory(){
   const mobKey = currentExpeditionMob();
-  const base = SEWER_MOBS[mobKey];
+  const base = ALL_MOBS[mobKey];
   if (base.flag) expedition.flags[base.flag] = true;
-  expedition.sumDmg += battle ? battle.sumDmgTaken : 0; // battle is null when a sewer event resolved peacefully
+  expedition.sumDmg += battle ? battle.sumDmgTaken : 0; // battle is null when a narrative event resolved peacefully
   expedition.nodeIndex++;
   if (expedition.nodeIndex >= expedition.route.length){
     // route complete -> final reward
-    const reward = rollSewerRewards(expedition.flags, expedition.sumDmg);
+    const rewardFn = expedition.locationId==="farlands" ? rollFarlandsRewards : rollSewerRewards;
+    const reward = rewardFn(expedition.flags, expedition.sumDmg);
     for (const [id,qty] of Object.entries(reward.items)) addItem(id, qty);
     player.io += reward.io;
     player.ar += (reward.ar||0);
@@ -1969,12 +2454,13 @@ function abandonExpedition(){
   expedition = null;
 }
 
-// Enters the node for `mobKey`: ~25% of the time (for eligible non-boss, non-flagged mobs) a random
-// narrative encounter plays instead of the straight fight; otherwise it's a normal battle as before.
+// Enters the node for `mobKey`: a location-dependent chance (for eligible non-boss, non-flagged mobs) plays
+// a random narrative encounter instead of the straight fight; otherwise it's a normal battle as before.
 function proceedToNode(mobKey){
-  const base = SEWER_MOBS[mobKey];
+  const base = ALL_MOBS[mobKey];
   const eligible = base && !base.boss && !base.flag;
-  if (eligible && Math.random() < 0.25){
+  const chance = LOCATION_EVENT_CHANCE[expedition ? expedition.locationId : "sewer"] || 0.25;
+  if (eligible && Math.random() < chance){
     startSewerEvent();
   } else {
     startBattle(mobKey);
@@ -2001,19 +2487,21 @@ function continueExpeditionAfterNode(){
 }
 
 // ===================== SEWER EVENT CONTROLLER =====================
+// (name kept for continuity — this now drives narrative events for whichever location is active,
+// see currentEventTable()/currentEventEffectFn())
 var sewerEventTypeKey = null;
 var sewerEventNode = null;
 var sewerEventEndMsg = null;
 
 function startSewerEvent(){
-  const keys = Object.keys(SEWER_EVENTS);
+  const keys = Object.keys(currentEventTable());
   sewerEventTypeKey = keys[Math.floor(Math.random()*keys.length)];
   sewerEventNode = "start";
   sewerEventEndMsg = null;
 }
 
 function chooseSewerEventOption(idx){
-  const type = SEWER_EVENTS[sewerEventTypeKey];
+  const type = currentEventTable()[sewerEventTypeKey];
   const node = type.tree[sewerEventNode];
   const opt = node.options[idx];
   if (!opt) return;
@@ -2021,7 +2509,7 @@ function chooseSewerEventOption(idx){
     startEventFight(opt.fight);
     return;
   }
-  const effectMsg = opt.effect ? applySewerEventEffect(opt.effect) : "";
+  const effectMsg = opt.effect ? currentEventEffectFn()(opt.effect) : "";
   if (opt.next){
     sewerEventNode = opt.next;
   } else {
@@ -2236,19 +2724,20 @@ function slotHtml(side, line, idx, unit){
   const arrLen = (line==="front"?battle.player.front:battle.player.back).length;
   return `<div class="unit-slot filled" data-role="slot" data-side="${side}" data-line="${line}" data-idx="${idx}">
     ${unitCardHtml(unit, {draggable: side==="player" && battle && battle.phase==="setup", role:"slot", line, idx, selected:isSel})}
-    ${showArrows ? slotArrowsHtml(line, idx, arrLen) : ""}
+    ${showArrows ? slotArrowsHtml(line, idx, arrLen, unit.movedThisTurn) : ""}
   </div>`;
 }
 
-function slotArrowsHtml(line, idx, arrLen){
-  const canLeft = idx>0;
-  const canRight = idx<arrLen-1;
+function slotArrowsHtml(line, idx, arrLen, movedThisTurn){
+  const canLeft = idx>0 && !movedThisTurn;
+  const canRight = idx<arrLen-1 && !movedThisTurn;
+  const canVert = !movedThisTurn;
   const vertLabel = line==="front" ? "▼" : "▲";
-  const vertTitle = line==="front" ? "В тыл" : "На фронт";
+  const vertTitle = movedThisTurn ? "Уже перемещался в этот ход" : (line==="front" ? "В тыл" : "На фронт");
   return `<div class="slot-arrows">
-    <button class="arrow-btn" data-arrow="left" ${canLeft?"":"disabled"} title="Влево">◀</button>
-    <button class="arrow-btn" data-arrow="vert" title="${vertTitle}">${vertLabel}</button>
-    <button class="arrow-btn" data-arrow="right" ${canRight?"":"disabled"} title="Вправо">▶</button>
+    <button class="arrow-btn" data-arrow="left" ${canLeft?"":"disabled"} title="${movedThisTurn?"Уже перемещался в этот ход":"Влево"}">◀</button>
+    <button class="arrow-btn" data-arrow="vert" ${canVert?"":"disabled"} title="${vertTitle}">${vertLabel}</button>
+    <button class="arrow-btn" data-arrow="right" ${canRight?"":"disabled"} title="${movedThisTurn?"Уже перемещался в этот ход":"Вправо"}">▶</button>
   </div>`;
 }
 
@@ -2283,10 +2772,13 @@ function isItemUsableOnUnit(unit, itemId){
 }
 
 function renderInventory(){
+  const cheapestCaseCost = Math.min(BIG_CASE_COST, MECHA_CASE_COST, CRAP_CASE_COST);
+  const isBroke = player.freeCases<=0 && !canAffordIo(cheapestCaseCost);
   const rosterHtml = player.units.length
     ? player.units.map(u=>`<div data-inv-unit="${u.uid}">${unitCardHtml(u, {draggable:false, selected: u.uid===invSelectedUid})}</div>`).join("")
     : `<div class="empty-note">Пока никого нет. Скрафтите юнита во вкладке «Крафт».</div>
-       <button class="btn btn-primary" id="call-steyn-btn">☎ Позвонить дяде Штейну</button>`;
+       <button class="btn btn-primary" id="call-steyn-btn">☎ Позвонить дяде Штейну</button>
+       ${isBroke ? `<button class="btn btn-ghost" id="call-steyn-bailout-btn">☎ Попросить у Штейна денежный бейлаут</button>` : ""}`;
 
   const selectedUnit = invSelectedUid ? player.units.find(u=>u.uid===invSelectedUid) : null;
 
@@ -2343,6 +2835,17 @@ function renderInventory(){
     steynBtn.addEventListener("click", ()=>{
       const amount = callUncleSteyn();
       invMessage = `Дядя Штейн разочарованно вздыхает, но подгоняет фургон — получено ${amount} бесплатных кейсов.`;
+      renderAll();
+    });
+  }
+  const steynBailoutBtn = document.getElementById("call-steyn-bailout-btn");
+  if (steynBailoutBtn){
+    steynBailoutBtn.addEventListener("click", ()=>{
+      const res = callUncleSteynMoneyBailout();
+      const takenList = res.taken.length
+        ? res.taken.map(t=>itemName(t.id)+" ×"+t.qty).join(", ")
+        : "(взять было особо нечего)";
+      invMessage = `Штейн долго ругается — «совсем стыд потерял, ни армии, ни Ио» — забирает: ${takenList}. Взамен кидает ${res.bailout} Ио «в последний раз».`;
       renderAll();
     });
   }
@@ -2496,26 +2999,43 @@ function renderExpedition(){
 
 function renderExpeditionHub(){
   const msgHtml = lastExpeditionMsg ? `<p class="inv-message">${lastExpeditionMsg}</p>` : "";
+  const farlandsUnlocked = hasItem("portal_key", 1);
+  const noRoster = !player.units.length;
   document.getElementById("view").innerHTML = `
     <section class="panel">
       <h2>Неевклидова канализация</h2>
-      <p class="muted">Пять клеток случайного маршрута. Дальше — только хуже. Разумная логика тут не работает.</p>
-      <button class="btn btn-primary" id="start-expedition-btn" ${player.units.length? "" : "disabled"}>Отправиться в поход</button>
-      ${player.units.length? "" : '<p class="muted small">Нужен хотя бы один юнит в отряде — загляните в «Инвентарь», если совсем никого не осталось.</p>'}
-      ${msgHtml}
+      <p class="muted">Шесть-семь клеток случайного маршрута. Дальше — только хуже. Разумная логика тут не работает.</p>
+      <button class="btn btn-primary" id="start-sewer-btn" ${noRoster? "disabled" : ""}>Отправиться в поход</button>
     </section>
+    <section class="panel">
+      <h2>Туманные земли ${farlandsUnlocked?"":"🔒"}</h2>
+      ${farlandsUnlocked
+        ? `<p class="muted">Дальше, гуще и куда опаснее канализации — зато и добыча соответствующая. Маршрут каждый раз прокладывается заново.</p>
+           <button class="btn btn-primary" id="start-farlands-btn" ${noRoster? "disabled" : ""}>Отправиться в туман</button>`
+        : `<p class="muted">Проход закрыт. Нужен Портальный ключ * — скрафтите его из Осколков портала * (продаёт Диоген в канализации) и Безумия в банке.</p>`
+      }
+    </section>
+    ${noRoster? '<p class="muted small">Нужен хотя бы один юнит в отряде — загляните в «Инвентарь», если совсем никого не осталось.</p>' : ""}
+    ${msgHtml}
   `;
   lastExpeditionMsg = null;
-  document.getElementById("start-expedition-btn").addEventListener("click", ()=>{
-    startExpedition();
+  document.getElementById("start-sewer-btn").addEventListener("click", ()=>{
+    startExpedition("sewer");
     proceedToNode(currentExpeditionMob());
   });
+  const farlandsBtn = document.getElementById("start-farlands-btn");
+  if (farlandsBtn){
+    farlandsBtn.addEventListener("click", ()=>{
+      startExpedition("farlands");
+      proceedToNode(currentExpeditionMob());
+    });
+  }
 }
 
-// Narrative "encounter" screen for a Round-7 sewer event — reuses the same dialogue-tree pattern
+// Narrative "encounter" screen for a Round-7 sewer/Farlands event — reuses the same dialogue-tree pattern
 // (and .notif-* CSS) as the phone-call notifications.
 function renderSewerEvent(){
-  const type = SEWER_EVENTS[sewerEventTypeKey];
+  const type = currentEventTable()[sewerEventTypeKey];
   if (sewerEventEndMsg){
     document.getElementById("view").innerHTML = `
       <section class="panel">
@@ -2792,7 +3312,7 @@ function renderExpeditionReport(){
       <h2>Отчёт об экспедиции</h2>
       <p>Маршрут пройден полностью.</p>
       <p><b>Ио:</b> +${r.io}</p>
-      ${r.ar ? `<p><b>АР:</b> +${r.ar} <span class="muted small">(редкая находка!)</span></p>` : ""}
+      ${r.ar ? `<p><b>АР:</b> +${r.ar}${expedition.locationId==="farlands" ? "" : ' <span class="muted small">(редкая находка!)</span>'}</p>` : ""}
       <p><b>Предметы:</b> ${items}</p>
       <button class="btn btn-primary" id="finish-expedition-btn">В штаб</button>
     </section>
@@ -3080,6 +3600,15 @@ function renderShop(){
       ${martynLastLine ? `<p class="martyn-line">«${martynLastLine}»</p>` : ""}
     </section>
     <section class="panel">
+      <h2>Обменять АР</h2>
+      <p class="muted small">Мартын неохотно, но меняет АР на Ио — курс ${AR_TO_IO_RATE} Ио за 1 АР. У вас: ${player.ar} АР.</p>
+      <div class="exchange-row">
+        <button class="btn" data-exchange-ar="1" ${player.ar>=1?"":"disabled"}>Обменять 1 АР</button>
+        <button class="btn" data-exchange-ar="5" ${player.ar>=5?"":"disabled"}>Обменять 5 АР</button>
+        <button class="btn btn-primary" data-exchange-ar="${player.ar}" ${player.ar>0?"":"disabled"}>Обменять всё (${player.ar})</button>
+      </div>
+    </section>
+    <section class="panel">
       <h2>Продать</h2>
       <p class="muted small">Клик по предмету продаёт сразу всю стопку.</p>
       ${itemsHtml}
@@ -3088,6 +3617,13 @@ function renderShop(){
   document.getElementById("view").querySelectorAll('[data-sell-item]').forEach(el=>{
     el.addEventListener("click", ()=>{
       const res = sellItem(el.dataset.sellItem);
+      if (res.ok){ martynLastLine = res.line; }
+      renderAll();
+    });
+  });
+  document.getElementById("view").querySelectorAll('[data-exchange-ar]').forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const res = exchangeArForIo(parseInt(el.dataset.exchangeAr,10));
       if (res.ok){ martynLastLine = res.line; }
       renderAll();
     });
@@ -3270,8 +3806,8 @@ function wireBattleArrows(){
   wireBattleItemTray();
 }
 
-// Round 8: hover-reveal target badge on each attacking player unit (➤ front-row, ✛ back-row ranged),
-// click to cycle to the next valid candidate; hovering also outlines the currently-targeted enemy slot.
+// Round 8: hover-reveal target badge (🎯) on each attacking player unit, click to cycle to the next
+// valid candidate; hovering the slot (card OR badge) outlines the currently-targeted enemy slot.
 function wireTargeting(){
   if (!battle || battle.phase !== "playerTurn") return;
   const view = document.getElementById("view");
@@ -3287,7 +3823,7 @@ function wireTargeting(){
     const badge = document.createElement("div");
     badge.className = "target-badge";
     badge.title = "Сменить цель";
-    badge.textContent = (line==="back" ? "✛" : "➤");
+    badge.textContent = "🎯";
     badge.addEventListener("click", (e)=>{
       e.stopPropagation();
       cycleUnitTarget(line, idx);
@@ -3296,10 +3832,10 @@ function wireTargeting(){
     slotEl.appendChild(badge);
 
     const targetSlotEl = view.querySelector(`.unit-slot[data-side="enemy"][data-line="${unit.targetLine}"][data-idx="${unit.targetIdx}"]`);
-    const card = slotEl.querySelector(".unit-card");
-    if (card && targetSlotEl){
-      card.addEventListener("mouseenter", ()=>{ targetSlotEl.classList.add("is-targeted"); });
-      card.addEventListener("mouseleave", ()=>{ targetSlotEl.classList.remove("is-targeted"); });
+    // hover on the whole slot (card AND badge both count) so moving onto the badge doesn't drop the highlight
+    if (targetSlotEl){
+      slotEl.addEventListener("mouseenter", ()=>{ targetSlotEl.classList.add("is-targeted"); });
+      slotEl.addEventListener("mouseleave", ()=>{ targetSlotEl.classList.remove("is-targeted"); });
     }
   });
 }
@@ -3410,7 +3946,7 @@ function renderQuests(){
       <div class="quest-card">
         <div class="quest-text">${q.text}</div>
         <div class="quest-req">Нужно: ${itemName(q.itemId)} — ${have}/${q.qty}</div>
-        <div class="quest-reward">Награда: ${q.rewardIo} Ио</div>
+        <div class="quest-reward">Награда: ${q.rewardAmount} ${q.rewardType==="ar"?"АР":"Ио"}</div>
         <button class="btn ${enough?"btn-primary":""}" data-claim-quest="${q.id}" ${enough?"":"disabled"}>Сдать</button>
       </div>`;
   }).join("");
@@ -3490,6 +4026,29 @@ function renderNotifications(){
 }
 
 // ===================== PERSISTENCE =====================
+// Full progress wipe — used by the Settings tab. Resets every piece of persistent state back to a
+// fresh-game default and saves immediately.
+function resetProgress(){
+  Object.assign(player, {
+    io: 300, ar: 20, inventory: {}, units: [], discovered: {}, lastArDay: null,
+    quests: [], notifications: [], freeCases: 0, settings: { mimicsEnabled: true }
+  });
+  player.units.push(makeUnitInstance("brave_warrior"));
+  caseLog = [];
+  mechaCaseLog = [];
+  crapCaseLog = [];
+  mechaAssembly = { firmware:null, chassis:null, movement:null };
+  expedition = null;
+  battle = null;
+  sewerEventTypeKey = null; sewerEventNode = null; sewerEventEndMsg = null;
+  martynLastLine = null;
+  questMessage = null;
+  notifFlashMsg = null;
+  currentTab = "inventory";
+  selected = null; invSelectedUid = null; invMessage = null;
+  saveGame();
+}
+
 // Uses window.storage when running as a Claude.ai artifact; falls back to localStorage
 // for a standalone deploy (e.g. GitHub Pages), where window.storage doesn't exist.
 const SAVE_KEY = "minislop88_save";
@@ -3527,6 +4086,7 @@ async function loadGame(){
     if (!player.discovered) player.discovered = {};
     if (!player.quests) player.quests = [];
     if (!player.notifications) player.notifications = [];
+    if (!player.settings) player.settings = { mimicsEnabled: true };
     if (Array.isArray(saved.caseLog)) caseLog = saved.caseLog;
     if (Array.isArray(saved.mechaCaseLog)) mechaCaseLog = saved.mechaCaseLog;
     if (Array.isArray(saved.crapCaseLog)) crapCaseLog = saved.crapCaseLog;
@@ -3534,6 +4094,58 @@ async function loadGame(){
     if (saved.currentTab) currentTab = saved.currentTab;
     return true;
   } catch(e){ return false; }
+}
+
+// ===================== RENDER: SETTINGS =====================
+var settingsConfirmingReset = false;
+
+function renderSettings(){
+  document.getElementById("view").innerHTML = `
+    <section class="panel">
+      <h2>Настройки</h2>
+      <div class="settings-row">
+        <div class="settings-label">
+          <div class="settings-title">Мимики</div>
+          <div class="muted small">Шанс, что Большой кейс вместо предмета окажется мимиком.</div>
+        </div>
+        <button class="btn ${player.settings.mimicsEnabled?"btn-primary":""}" id="toggle-mimics-btn">
+          ${player.settings.mimicsEnabled ? "Включены" : "Отключены"}
+        </button>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Сброс прогресса</h2>
+      <p class="muted small">Полностью обнуляет Ио, АР, инвентарь, отряд, квесты и историю кейсов. Отменить нельзя.</p>
+      ${settingsConfirmingReset
+        ? `<div class="settings-row">
+             <button class="btn btn-danger" id="confirm-reset-btn">Да, обнулить всё</button>
+             <button class="btn" id="cancel-reset-btn">Отмена</button>
+           </div>`
+        : `<button class="btn btn-ghost" id="reset-progress-btn">Обнулить прогресс</button>`
+      }
+    </section>
+  `;
+  const toggleBtn = document.getElementById("toggle-mimics-btn");
+  if (toggleBtn) toggleBtn.addEventListener("click", ()=>{
+    player.settings.mimicsEnabled = !player.settings.mimicsEnabled;
+    renderAll();
+  });
+  const resetBtn = document.getElementById("reset-progress-btn");
+  if (resetBtn) resetBtn.addEventListener("click", ()=>{
+    settingsConfirmingReset = true;
+    renderAll();
+  });
+  const confirmBtn = document.getElementById("confirm-reset-btn");
+  if (confirmBtn) confirmBtn.addEventListener("click", ()=>{
+    settingsConfirmingReset = false;
+    resetProgress();
+    renderAll();
+  });
+  const cancelBtn = document.getElementById("cancel-reset-btn");
+  if (cancelBtn) cancelBtn.addEventListener("click", ()=>{
+    settingsConfirmingReset = false;
+    renderAll();
+  });
 }
 
 // ===================== MAIN RENDER DISPATCH =====================
@@ -3549,6 +4161,7 @@ function renderAll(){
   else if (currentTab==="casino") renderCasino();
   else if (currentTab==="quests") renderQuests();
   else if (currentTab==="notifications") renderNotifications();
+  else if (currentTab==="settings") renderSettings();
   scheduleSave();
 }
 
