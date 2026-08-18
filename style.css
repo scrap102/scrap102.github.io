@@ -312,6 +312,8 @@ body{
 }
 .unit-slot.filled:hover .target-badge{ opacity: 1; pointer-events: auto; }
 .unit-slot.is-targeted{ outline: 2px solid var(--danger); outline-offset: 2px; border-radius: 6px; }
+.target-badge.enemy-badge{ background: var(--amber); color: #1b1712; }
+.unit-slot.is-threatened{ outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 6px; }
 
 .enemy-panel{ border-color: rgba(177,80,63,0.4); }
 .roster-pool{ margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); min-height: 60px; }
@@ -372,4 +374,9 @@ body{
   .topbar{ flex-direction: column; align-items: flex-start; }
   .unit-card{ width: 58px; }
   .unit-slot{ width: 58px; height: 70px; }
+}
+
+.build-version{
+  position: fixed; left: 8px; bottom: 6px; font-family: var(--font-mono); font-size: 11px;
+  color: var(--muted); opacity: .6; pointer-events: none; z-index: 50;
 }

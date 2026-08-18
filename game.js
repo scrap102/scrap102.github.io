@@ -575,8 +575,8 @@ const CASE_CATALOG = [
 // Sell price by rarity tier. Tuned so opening a Big Case (15 Ио) and selling everything you get
 // pays back roughly 20-30% on average.
 const SELL_PRICE = {
-  trash: 1, suchself: 1, normal: 2, rare: 4,
-  precious: 7, legendary: 12, artifact: 20, inonecopy: 40
+  trash: 1, suchself: 2, normal: 3, rare: 6,
+  precious: 10, legendary: 17, artifact: 28, inonecopy: 55
 };
 
 const MARTYN_LINES = [
@@ -608,18 +608,24 @@ const MARTYN_LINES = [
 
 
 const SEWER_MOBS = {
-  1: {name:"Псевдосфера псевдокоричневой псевдомассы", hp:15, dmg:3, shld:0},
+  1: {name:"Псевдосфера псевдокоричневой псевдомассы", hp:19, dmg:4, shld:0},
   2: {name:"Плохая вода", hp:20, dmg:2, shld:0, flag:"badwater"},
-  3: {name:"Неевклид", hp:20, dmg:3, shld:1},
-  4: {name:"Прямая", hp:10, dmg:2, shld:2},
+  3: {name:"Неевклид", hp:25, dmg:4, shld:2},
+  4: {name:"Пересекающиеся Прямые", hp:14, dmg:2, shld:2, pack:[
+        {name:"Прямая",hp:7,dmg:2,shld:1}, {name:"Прямая",hp:7,dmg:2,shld:1}
+      ]},
   5: {name:"Кривая", hp:5, dmg:3, shld:0},
-  6: {name:"Странная", hp:15, dmg:2, shld:0},
-  7: {name:"Гиперболический мох", hp:7, dmg:2, shld:1},
+  6: {name:"Странная", hp:19, dmg:3, shld:0},
+  7: {name:"Клочья гиперболического мха", hp:12, dmg:2, shld:1, pack:[
+        {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0}, {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0}, {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0}
+      ]},
   8: {name:"Бочка", hp:30, dmg:0, shld:3, flag:"barrel"},
   9: {name:"Парадокс", hp:40, dmg:2, shld:2, boss:true, flag:"paradox", scalingDmgPerKill:1},
-  10:{name:"Вестник Евклида", hp:1, dmg:2, shld:1},
+  10:{name:"Вестники Евклида", hp:6, dmg:2, shld:1, pack:[
+        {name:"Вестник Евклида",hp:2,dmg:2,shld:0}, {name:"Вестник Евклида",hp:2,dmg:2,shld:0}, {name:"Вестник Евклида",hp:2,dmg:2,shld:0}
+      ]},
   11:{name:"Евклид", hp:50, dmg:4, shld:2, boss:true, flag:"euclid"},
-  12:{name:"Александр", hp:8, dmg:3, shld:1}
+  12:{name:"Александр", hp:11, dmg:4, shld:1}
 };
 
 const SEWER_ROUTES = [
@@ -985,21 +991,27 @@ console.log("data module ok", Object.keys(ITEM_DB).length, "items,", Object.keys
 // of picked from a fixed list like the sewer's SEWER_ROUTES.
 const FARLANDS_MOBS = {
   // tier 1
-  f1: {name:"Туманный заяц-провокатор", hp:11, dmg:3, shld:0},
+  f1: {name:"Парочка туманных зайцев-провокаторов", hp:14, dmg:3, shld:0, pack:[
+        {name:"Туманный заяц-провокатор",hp:7,dmg:3,shld:0}, {name:"Туманный заяц-провокатор",hp:7,dmg:3,shld:0}
+      ]},
   f2: {name:"Мшистый пень с характером", hp:15, dmg:2, shld:1},
   f3: {name:"Летающая шишка-камикадзе", hp:9, dmg:4, shld:0},
   f4: {name:"Блуждающий огонёк-должник", hp:13, dmg:2, shld:1},
   f5: {name:"Гриб-подслушиватель", hp:14, dmg:2, shld:1},
   // tier 2
-  f6: {name:"Лесной торговец краденым туманом", hp:20, dmg:3, shld:1},
-  f7: {name:"Одичавший садовый гном-мародёр", hp:19, dmg:4, shld:1},
-  f8: {name:"Дерево со слишком многими мнениями", hp:24, dmg:2, shld:2},
-  f9: {name:"Стая туманных ворон-бухгалтеров", hp:18, dmg:3, shld:0, flag:"crowaudit", scalingDmgPerKill:1},
-  f10:{name:"Олень о восьми ногах, как минимум", hp:26, dmg:3, shld:1},
+  f6: {name:"Лесной торговец краденым туманом", hp:24, dmg:4, shld:1},
+  f7: {name:"Одичавший садовый гном-мародёр", hp:23, dmg:5, shld:1},
+  f8: {name:"Дерево со слишком многими мнениями", hp:28, dmg:3, shld:2},
+  f9: {name:"Стая туманных ворон-бухгалтеров", hp:24, dmg:0, shld:0, flag:"crowaudit", scalingDmgPerKill:1, pack:[
+        {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0}, {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0}, {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0}
+      ]},
+  f10:{name:"Олень о восьми ногах, как минимум", hp:30, dmg:4, shld:1},
   // tier 3
-  f11:{name:"Ходячий, подозрительно осведомлённый валежник", hp:33, dmg:4, shld:1},
-  f12:{name:"Туманная гончая о трёх головах (каждая врёт)", hp:36, dmg:5, shld:1},
-  f13:{name:"Вендиго на пенсии, но всё ещё голодный", hp:38, dmg:4, shld:2},
+  f11:{name:"Ходячий, подозрительно осведомлённый валежник", hp:38, dmg:5, shld:1},
+  f12:{name:"Туманная гончая о трёх головах (каждая врёт)", hp:44, dmg:0, shld:0, pack:[
+        {name:"Левая голова гончей",hp:14,dmg:3,shld:0}, {name:"Центральная голова гончей",hp:16,dmg:4,shld:1}, {name:"Правая голова гончей",hp:14,dmg:3,shld:0}
+      ]},
+  f13:{name:"Вендиго на пенсии, но всё ещё голодный", hp:44, dmg:5, shld:2},
   // bosses
   fb1:{name:"Лесная Ведьма Тумана", hp:48, dmg:5, shld:2, boss:true, flag:"fogwitch"},
   fb2:{name:"Прадед Рогов, Древний Патриарх Оленей", hp:55, dmg:5, shld:3, boss:true, flag:"antlerlord", scalingDmgPerKill:1}
@@ -1630,9 +1642,26 @@ function makeUnitInstance(unitId){
   };
 }
 
-function makeEnemyInstance(mobKey){
+function makeEnemyInstances(mobKey){
   const base = ALL_MOBS[mobKey];
-  return {
+  if (base.pack){
+    return base.pack.map((p, i)=>({
+      uid: nextUid(),
+      unitId: "mob_"+mobKey+"_"+i,
+      name: p.name,
+      hp: p.hp,
+      maxHp: p.hp,
+      dmg: p.dmg,
+      shld: p.shld||0,
+      boss: false,
+      flag: null, // reward flags are read off the route's mobKey table entry, not per pack-member instances
+      scalingDmgPerKill: p.scalingDmgPerKill || 0,
+      abilities: [],
+      turnCounter: 0,
+      dead: false
+    }));
+  }
+  return [{
     uid: nextUid(),
     unitId: "mob_"+mobKey,
     name: base.name,
@@ -1646,7 +1675,7 @@ function makeEnemyInstance(mobKey){
     abilities: [],
     turnCounter: 0,
     dead: false
-  };
+  }];
 }
 
 var player = {
@@ -1803,10 +1832,11 @@ function emptySide(width){
 var battle = null; // current battle state
 
 function startBattle(mobKey, opts){
-  const enemyUnit = (mobKey !== null && mobKey !== undefined) ? makeEnemyInstance(mobKey) : null;
-  const width = computeFieldWidth(player.units.length, enemyUnit ? 1 : 0);
+  const enemyInstances = (mobKey !== null && mobKey !== undefined) ? makeEnemyInstances(mobKey) : [];
+  const width = computeFieldWidth(player.units.length, enemyInstances.length);
   const enemy = emptySide(width);
-  if (enemyUnit) enemy.front[centeredStart(width,1)] = enemyUnit;
+  const start = centeredStart(width, enemyInstances.length);
+  enemyInstances.forEach((inst,i)=>{ enemy.front[start+i] = inst; });
   battle = {
     player: emptySide(width),
     enemy: enemy,
@@ -1874,6 +1904,20 @@ function beginRounds(){
 // movement during playerTurn: swap two slots (can be adjacent-left/right within a line, or front<->back same column).
 // Each unit gets one move per turn — but a unit that already used its move can still be swapped INTO by a
 // different unit that hasn't moved yet (it's just being displaced, not spending its own move budget).
+// Free repositioning during setup — drag one already-placed unit onto another slot to swap them.
+// No per-turn move limit here (that's a mid-battle rule); anything goes before the fight starts.
+function swapUnitsInSetup(fromLine, fromIdx, toLine, toIdx){
+  if (battle.phase !== "setup") return false;
+  const fromArr = fromLine==="front"?battle.player.front:battle.player.back;
+  const toArr = toLine==="front"?battle.player.front:battle.player.back;
+  if (!fromArr[fromIdx]) return false;
+  if (fromLine===toLine && fromIdx===toIdx) return false;
+  const tmp = toArr[toIdx];
+  toArr[toIdx] = fromArr[fromIdx];
+  fromArr[fromIdx] = tmp;
+  return true;
+}
+
 function moveUnit(fromLine, fromIdx, toLine, toIdx){
   if (battle.phase !== "playerTurn") return false;
   const fromArr = fromLine==="front"?battle.player.front:battle.player.back;
@@ -2119,7 +2163,56 @@ function resolvePlayerAttack(){
   resolveEnemyAttack();
 }
 
+// Enemy AI repositioning: at the start of the enemy's turn, front-row enemies may shuffle one column
+// left/right — either to flee a strong attacker currently locked onto them, or to reach a weaker player
+// unit that's only reachable from the neighboring column. Kept deliberately simple (no lookahead beyond
+// one step, no enemy-on-enemy swapping).
+function repositionEnemiesAtTurnStart(){
+  const width = battle.width;
+  const arr = battle.enemy.front;
+  for (let idx=0; idx<arr.length; idx++){
+    const u = arr[idx];
+    if (!u || u.dead) continue;
+    if (Math.random() > 0.35) continue;
+    const candidates = [idx-1, idx+1].filter(i=> i>=0 && i<width && !arr[i]);
+    if (!candidates.length) continue;
+
+    function weakestTargetHp(atIdx){
+      const targets = validTargetsFor("front", atIdx, battle.player, width);
+      let min = null;
+      for (const t of targets){
+        const tArr = t.line==="front" ? battle.player.front : battle.player.back;
+        const tu = tArr[t.idx];
+        if (tu && !tu.dead && (min===null || tu.hp < min)) min = tu.hp;
+      }
+      return min;
+    }
+    const curWeakest = weakestTargetHp(idx);
+
+    const attackers = [];
+    for (const pl of ["front","back"]){
+      battle.player[pl].forEach(pu=>{ if (pu && !pu.dead && pu.targetLine==="front" && pu.targetIdx===idx) attackers.push(pu); });
+    }
+    const underThreat = attackers.some(a => a.dmg >= u.hp * 0.5);
+
+    let bestIdx = null, bestWeakest = curWeakest;
+    for (const cIdx of candidates){
+      const w = weakestTargetHp(cIdx);
+      if (w!==null && (bestWeakest===null || w < bestWeakest)){ bestWeakest = w; bestIdx = cIdx; }
+    }
+    if (bestIdx===null && underThreat){
+      bestIdx = candidates[Math.floor(Math.random()*candidates.length)];
+    }
+    if (bestIdx!==null){
+      arr[bestIdx] = u;
+      arr[idx] = null;
+      u.targetLine = null; u.targetIdx = null; // column changed — re-default on next resolution
+    }
+  }
+}
+
 function resolveEnemyAttack(){
+  repositionEnemiesAtTurnStart();
   const dealt = resolveAttacks(battle.enemy, battle.player);
   if (dealt>0){
     battle.sumDmgTaken += dealt;
@@ -2251,13 +2344,6 @@ function exchangeArForIo(arAmount){
   player.io += ioGained;
   const line = MARTYN_LINES[Math.floor(Math.random()*MARTYN_LINES.length)];
   return {ok:true, ioGained, arSpent:arAmount, line};
-}
-
-// Uncle Steyn — emergency backup when the roster hits zero units.
-function callUncleSteyn(){
-  const amount = 10 + Math.floor(Math.random()*11); // 10-20 inclusive
-  player.freeCases += amount;
-  return amount;
 }
 
 // Uncle Steyn — money bailout for when the player is broke AND has an empty roster (can't even fight
@@ -2434,6 +2520,12 @@ function advanceExpeditionAfterVictory(){
   const base = ALL_MOBS[mobKey];
   if (base.flag) expedition.flags[base.flag] = true;
   expedition.sumDmg += battle ? battle.sumDmgTaken : 0; // battle is null when a narrative event resolved peacefully
+  if (battle){
+    // Ио now drops per mob along the way too, not just as one lump sum at the end of the route —
+    // makes a smaller army viable to farm with, rather than needing to clear the whole route to see anything.
+    const mobIoDrop = Math.floor(base.hp/3) + Math.floor(Math.random()*8);
+    player.io += mobIoDrop;
+  }
   expedition.nodeIndex++;
   if (expedition.nodeIndex >= expedition.route.length){
     // route complete -> final reward
@@ -2777,7 +2869,6 @@ function renderInventory(){
   const rosterHtml = player.units.length
     ? player.units.map(u=>`<div data-inv-unit="${u.uid}">${unitCardHtml(u, {draggable:false, selected: u.uid===invSelectedUid})}</div>`).join("")
     : `<div class="empty-note">Пока никого нет. Скрафтите юнита во вкладке «Крафт».</div>
-       <button class="btn btn-primary" id="call-steyn-btn">☎ Позвонить дяде Штейну</button>
        ${isBroke ? `<button class="btn btn-ghost" id="call-steyn-bailout-btn">☎ Попросить у Штейна денежный бейлаут</button>` : ""}`;
 
   const selectedUnit = invSelectedUid ? player.units.find(u=>u.uid===invSelectedUid) : null;
@@ -2830,14 +2921,6 @@ function renderInventory(){
       renderAll();
     });
   });
-  const steynBtn = document.getElementById("call-steyn-btn");
-  if (steynBtn){
-    steynBtn.addEventListener("click", ()=>{
-      const amount = callUncleSteyn();
-      invMessage = `Дядя Штейн разочарованно вздыхает, но подгоняет фургон — получено ${amount} бесплатных кейсов.`;
-      renderAll();
-    });
-  }
   const steynBailoutBtn = document.getElementById("call-steyn-bailout-btn");
   if (steynBailoutBtn){
     steynBailoutBtn.addEventListener("click", ()=>{
@@ -3061,6 +3144,29 @@ function renderSewerEvent(){
   });
 }
 
+// Auto-arrange for setup: tanky (high HP+shield) melee units go front, ranged and squishier units go
+// back. Deliberately simple — no lookahead on the specific enemy composition, just a sane default.
+function autoArrangeUnits(){
+  if (!battle || battle.phase !== "setup") return;
+  for (const line of [battle.player.front, battle.player.back]){
+    for (let i=0;i<line.length;i++){
+      if (line[i]){ player.units.push(line[i]); line[i]=null; }
+    }
+  }
+  const width = battle.width;
+  const pool = [...player.units];
+  const ranged = pool.filter(u=>u.abilities.some(a=>a.type==="ranged_attack"));
+  const melee = pool.filter(u=>!ranged.includes(u));
+  const tankScore = u => u.hp + (u.shld||0)*3;
+  melee.sort((a,b)=> tankScore(b)-tankScore(a));
+  const frontPicks = melee.slice(0, width);
+  const backPicks = [...ranged, ...melee.slice(width)].slice(0, width);
+  const frontStart = centeredStart(width, frontPicks.length);
+  frontPicks.forEach((u,i)=> deployUnit(u.uid, "front", frontStart+i));
+  const backStart = centeredStart(width, backPicks.length);
+  backPicks.forEach((u,i)=> deployUnit(u.uid, "back", backStart+i));
+}
+
 function renderBattleSetup(){
   const mobKey = battle.mobKey;
   const enemyAliveList = [...aliveList(battle.enemy.front), ...aliveList(battle.enemy.back)];
@@ -3078,17 +3184,22 @@ function renderBattleSetup(){
     </section>
     <section class="panel">
       <h2>Расстановка отряда</h2>
-      <p class="muted small">Перетащите юнитов (или кликните юнита, затем слот) на линию фронта или тыла.</p>
+      <p class="muted small">Перетащите юнитов (или кликните юнита, затем слот) на линию фронта или тыла. Можно перетаскивать уже выставленных юнитов друг на друга, чтобы поменять их местами.</p>
       ${rowHtml("Фронт","player","front", battle.player.front)}
       ${rowHtml("Тыл","player","back", battle.player.back)}
       <div class="roster-pool" data-role="roster-drop">
         <div class="line-label">Резерв</div>
         <div class="roster-grid">${rosterHtml}</div>
       </div>
+      <button class="btn" id="auto-arrange-btn">Расставить автоматически</button>
       <button class="btn btn-primary" id="begin-rounds-btn">Начать бой</button>
       <button class="btn btn-ghost" id="flee-setup-btn">Отступить</button>
     </section>
   `;
+  document.getElementById("auto-arrange-btn").addEventListener("click", ()=>{
+    autoArrangeUnits();
+    renderAll();
+  });
   document.getElementById("begin-rounds-btn").addEventListener("click", ()=>{
     if (beginRounds()) renderAll();
   });
@@ -3169,6 +3280,7 @@ function renderBattleFight(){
   });
   wireBattleArrows();
   wireTargeting();
+  wireEnemyTargeting();
 }
 
 function renderBattleOver(){
@@ -3255,16 +3367,28 @@ function onBattleOverContinue(){
   continueExpeditionAfterNode();
 }
 
+function canAffordTrade(t){
+  if (t.give.io && !canAffordIo(t.give.io)) return false;
+  if (t.give.ar && player.ar < t.give.ar) return false;
+  if (t.give.item && !hasItem(t.give.item, t.give.qty||1)) return false;
+  if (t.give.unit && !player.units.some(u=>u.unitId===t.give.unit)) return false;
+  return true;
+}
+
 function renderDiogenTrade(){
-  const rows = DIOGEN_TRADES.map(t=>`
+  const rows = DIOGEN_TRADES.map(t=>{
+    const affordable = canAffordTrade(t);
+    return `
     <div class="trade-row">
       <div class="trade-label">${t.label}</div>
-      <button class="btn btn-small" data-action="trade" data-trade="${t.id}">Обменять</button>
-    </div>`).join("");
+      <button class="btn btn-small ${affordable?"btn-primary":""}" data-action="trade" data-trade="${t.id}" ${affordable?"":"disabled"}>Обменять</button>
+    </div>`;
+  }).join("");
   document.getElementById("view").innerHTML = `
     <section class="panel">
       <h2>Диоген, торговец из-под бочки</h2>
       <p class="muted">«Тут внизу тоже есть экономика. Не спрашивай, откуда у меня столько Ио.»</p>
+      ${diogenLastMsg ? `<p class="inv-message">${diogenLastMsg}</p>` : ""}
       <div class="trade-list">${rows}</div>
       <button class="btn btn-primary" id="leave-trader-btn">Идти дальше</button>
     </section>
@@ -3273,6 +3397,7 @@ function renderDiogenTrade(){
     btn.addEventListener("click", ()=> doDiogenTrade(btn.dataset.trade));
   });
   document.getElementById("leave-trader-btn").addEventListener("click", ()=>{
+    diogenLastMsg = null;
     proceedToNode(expedition.pendingNextMob);
   });
 }
@@ -3280,10 +3405,7 @@ function renderDiogenTrade(){
 function doDiogenTrade(tradeId){
   const t = DIOGEN_TRADES.find(x=>x.id===tradeId);
   if (!t) return;
-  // check give
-  if (t.give.io && !canAffordIo(t.give.io)) return;
-  if (t.give.ar && player.ar < t.give.ar) return;
-  if (t.give.item && !hasItem(t.give.item, t.give.qty||1)) return;
+  if (!canAffordTrade(t)) return;
   if (t.give.unit){
     const idx = player.units.findIndex(u=>u.unitId===t.give.unit);
     if (idx<0) return;
@@ -3300,6 +3422,7 @@ function doDiogenTrade(tradeId){
     const inst = makeUnitInstance(t.get.unit) || {uid:nextUid(), unitId:t.get.unit, name:"Чел", hp:3, dmg:1, shld:0, abilities:[], dead:false};
     player.units.push(inst);
   }
+  diogenLastMsg = `Успешно обменяно: ${t.label}`;
   renderDiogenTrade();
   renderTopbar();
 }
@@ -3578,6 +3701,7 @@ function renderCatalog(){
 
 // ===================== RENDER: SHOP (Лавка Мартына) =====================
 var martynLastLine = null;
+var diogenLastMsg = null;
 
 function renderShop(){
   let itemsHtml = "";
@@ -3722,8 +3846,18 @@ function onSpinClick(){
   if (!res.ok){ casinoResultMsg = res.msg; renderAll(); return; }
   casinoSpinning = true;
   casinoResultMsg = null;
-  spinToIndex(res.idx);
+  // render once at the CURRENT (unspun) rotation first — spinToIndex must not run before this paint,
+  // otherwise the wheel-disc element gets recreated already at its target angle and the CSS transition
+  // has nothing to animate from (it just snaps). Bump the rotation only after this frame has painted,
+  // then push the new angle straight onto the existing element's style so the transition actually fires.
   renderAll();
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      spinToIndex(res.idx);
+      const disc = document.getElementById("wheel-disc");
+      if (disc) disc.style.transform = "rotate("+wheelRotation+"deg)";
+    });
+  });
   setTimeout(()=>{
     casinoSpinning = false;
     revealSpinResult(res);
@@ -3784,8 +3918,11 @@ function performMove(source, target){
     if (battle.phase!=="setup") return;
     undeployUnit(source.line, source.idx);
   } else if (source.type==="slot" && target.type==="slot" && target.side==="player"){
-    if (battle.phase!=="setup" && battle.phase!=="playerTurn") return;
-    moveUnit(source.line, source.idx, target.line, target.idx);
+    if (battle.phase==="setup"){
+      swapUnitsInSetup(source.line, source.idx, target.line, target.idx);
+    } else if (battle.phase==="playerTurn"){
+      moveUnit(source.line, source.idx, target.line, target.idx);
+    }
   }
 }
 
@@ -3836,6 +3973,35 @@ function wireTargeting(){
     if (targetSlotEl){
       slotEl.addEventListener("mouseenter", ()=>{ targetSlotEl.classList.add("is-targeted"); });
       slotEl.addEventListener("mouseleave", ()=>{ targetSlotEl.classList.remove("is-targeted"); });
+    }
+  });
+}
+
+// Preview of what each enemy is currently lined up to attack (recomputed live, same as the player's own
+// badge) — hover an enemy slot to see the player unit it's aiming at highlighted. No click-to-cycle;
+// the player doesn't control enemy targeting, only sees it coming.
+function wireEnemyTargeting(){
+  if (!battle || battle.phase !== "playerTurn") return;
+  const view = document.getElementById("view");
+  view.querySelectorAll('.unit-slot.filled[data-side="enemy"]').forEach(slotEl=>{
+    const line = slotEl.dataset.line, idx = Number(slotEl.dataset.idx);
+    const unit = line==="front" ? battle.enemy.front[idx] : battle.enemy.back[idx];
+    if (!unit || unit.dead) return;
+    const isRanged = unit.abilities.some(a=>a.type==="ranged_attack");
+    if (line==="back" && !isRanged) return; // this enemy doesn't attack from the back line
+    ensureUnitTarget(unit, line, idx, battle.player, battle.width);
+    if (unit.targetLine==null) return;
+
+    const badge = document.createElement("div");
+    badge.className = "target-badge enemy-badge";
+    badge.title = "Кого атакует";
+    badge.textContent = "⚔";
+    slotEl.appendChild(badge);
+
+    const targetSlotEl = view.querySelector(`.unit-slot[data-side="player"][data-line="${unit.targetLine}"][data-idx="${unit.targetIdx}"]`);
+    if (targetSlotEl){
+      slotEl.addEventListener("mouseenter", ()=>{ targetSlotEl.classList.add("is-threatened"); });
+      slotEl.addEventListener("mouseleave", ()=>{ targetSlotEl.classList.remove("is-threatened"); });
     }
   });
 }
