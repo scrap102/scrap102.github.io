@@ -564,9 +564,25 @@ const CASINO_ENEMY = { name:"Коллектор долгов *", hp:35, dmg:5, s
 const CASINO_WEAK_UNIT_POOL = ["brave_warrior","bob","slug"];
 
 // ===================== CASE CATALOG (for the "Каталог" tab) =====================
+// Weight tables double as both the actual roll logic (see rarityFromRoll/finishCaseOpen below) and the
+// odds displayed in the Каталог tab, so the two can never drift out of sync. Each table's weights must
+// sum to 101 (rolls are 0-100 inclusive).
+const BIG_CASE_WEIGHTS = [
+  {rarity:"trash", w:28}, {rarity:"suchself", w:25}, {rarity:"normal", w:21}, {rarity:"rare", w:14},
+  {rarity:"precious", w:8}, {rarity:"legendary", w:2}, {rarity:"artifact", w:1}, {rarity:"inonecopy", w:1},
+  {rarity:"mimic", w:1}
+];
+const MECHA_CASE_WEIGHTS = [
+  {rarity:"trash", w:45}, {rarity:"normal", w:38}, {rarity:"rare", w:11}, {rarity:"precious", w:5},
+  {rarity:"legendary", w:2}
+];
+const CRAP_CASE_WEIGHTS = [
+  {rarity:"trash", w:40}, {rarity:"suchself", w:30}, {rarity:"normal", w:20}, {rarity:"rare", w:11}
+];
+
 const CASE_CATALOG = [
-  {key:"big", label:"Большой кейс", pool:BIG_CASE_POOL},
-  {key:"mecha", label:"Мех-кейс", pool:MECHA_CASE_POOL}
+  {key:"big", label:"Большой кейс", pool:BIG_CASE_POOL, odds:BIG_CASE_WEIGHTS},
+  {key:"mecha", label:"Мех-кейс", pool:MECHA_CASE_POOL, odds:MECHA_CASE_WEIGHTS}
   // Кейс Говна reuses Big Case's own trash..rare pools (just different odds), so it isn't
   // listed as a separate catalog section — its possible drops already show under "Большой кейс".
 ];
@@ -1465,95 +1481,359 @@ function claimQuest(qid){
 // special case that hands off to a real battle instead of ending the dialogue normally.
 const NOTIF_TYPES = {
   uncle_steyn: { icon:"📞", title:"Дядя Штейн", weight:3, tree:{
-    start: { text:"Штейн: Слушай, племянник, у меня тут дело намечается. Будешь слушать или сразу вешать трубку?",
+    start: { text:[
+        "Штейн: Слушай, племянник, у меня тут дело намечается. Будешь слушать или сразу вешать трубку?",
+        "Штейн: О, ты живой. Хорошо. Плохо было бы наоборот. Разговор есть.",
+        "Штейн: Не клади трубку. В этот раз правда важно. Ну, как обычно важно.",
+        "Штейн: Угадай, кто. Нет, не угадаешь. Ладно, это я."
+      ],
       options:[
         {label:"Слушаю", next:"biz"},
-        {label:"Мне некогда", next:null, resultText:"Штейн разочарованно бурчит и кладёт трубку."}
+        {label:"Как сам вообще?", next:"smalltalk"},
+        {label:"Мне некогда", next:null, resultText:["Штейн разочарованно бурчит и кладёт трубку.","Штейн: Ну и ладно. Ну и не очень-то хотелось.","В трубке — гудки и что-то похожее на обиженное сопение."]}
       ]},
-    biz: { text:"Штейн: Короче, мне тут задолжали, а платить не могут по уважительным причинам. Могу подкинуть тебе дело — не останусь в долгу. Или просто поболтаем, если дела не заходят.",
+    biz: { text:[
+        "Штейн: Короче, мне тут задолжали, а платить не могут по уважительным причинам. Могу подкинуть тебе дело — не останусь в долгу. Или просто поболтаем, если дела не заходят.",
+        "Штейн: Есть работёнка. Не спрашивай откуда, не спрашивай зачем — просто принеси, что скажу.",
+        "Штейн: У меня тут завал с делами, а руки не доходят. Поможешь — сочтёмся."
+      ],
       options:[
         {label:"Что надо притащить?", effect:"steyn_quest", next:null},
         {label:"Просто поболтаем", next:"chat2"}
       ]},
-    chat2: { text:"Штейн травит байку о том, как когда-то обменял целую Бочку на честное слово. Слушать приятно, толку — ноль.",
+    chat2: { text:[
+        "Штейн травит байку о том, как когда-то обменял целую Бочку на честное слово. Слушать приятно, толку — ноль.",
+        "Штейн жалуется на фургон — опять барахлит коробка передач, «как будто нарочно, ей-богу».",
+        "Штейн вспоминает, как однажды продал самому себе кейс, «по ошибке, честное слово»."
+      ],
       options:[
+        {label:"А чем вообще занимался раньше?", next:"backstory"},
         {label:"Ладно, пока", effect:"steyn_chat_reward", next:null}
+      ]},
+    backstory: { text:[
+        "Штейн: Раньше? А, было дело. Решал вопросы. Теперь просто вожу фургон. Понижение, если честно. Но зато сплю спокойно.",
+        "Штейн: Не важно, чем занимался. Важно, что теперь — фургон, кейсы и ты. Скучновато, но живой.",
+        "Штейн подозрительно долго молчит, потом говорит «неважно» и меняет тему на погоду."
+      ],
+      options:[
+        {label:"Понятно, до связи", effect:"steyn_smalltalk_reward", next:null}
+      ]},
+    smalltalk: { text:[
+        "Штейн: Да так, помаленьку. Фургон дымит, колени скрипят, дело потихоньку. Обычное дело.",
+        "Штейн: Знаешь, неплохо. Вчера продал кому-то кейс, который сам же вчера и купил. Прибыль!",
+        "Штейн: Не спрашивал бы. Но раз спросил — плохо. Впрочем, как обычно. Пройдёт."
+      ],
+      options:[
+        {label:"Ладно, держись", effect:"steyn_smalltalk_reward", next:null}
       ]}
   }},
   vcvp: { icon:"🪐", title:"ВЦВП", weight:2, tree:{
-    start: { text:"Голос без интонации: Гражданин единицы измерения пространства-времени. Вы приписаны к призывному манёвру «Сектор-Ноль». Явка обязательна и одновременно необязательна — таковы правила ВЦВП.",
+    start: { text:[
+        "Голос без интонации: Гражданин единицы измерения пространства-времени. Вы приписаны к призывному манёвру «Сектор-Ноль». Явка обязательна и одновременно необязательна — таковы правила ВЦВП.",
+        "Голос без интонации: Внимание. Ваш номер выбран случайным неслучайным образом для участия в манёврах Всевселенной.",
+        "Голос без интонации: Данный звонок официально не является звонком. Пожалуйста, продолжайте слушать."
+      ],
       options:[
         {label:"Есть ли от чего откосить?", next:"dodge"},
         {label:"Что вообще происходит?", next:"explain"},
-        {label:"Положить трубку", next:null, resultText:"Голос продолжает говорить в пустоту ещё секунд десять после того, как вы положили трубку."}
+        {label:"Голос, ты вообще в порядке?", next:"human"},
+        {label:"Положить трубку", next:null, resultText:["Голос продолжает говорить в пустоту ещё секунд десять после того, как вы положили трубку.","Гудки. Где-то там голос всё ещё зачитывает форму 12-би вникуда."]}
       ]},
-    dodge: { text:"Голос: Согласно приложению 12-би от призыва освобождаются лица, предоставившие доказательство собственного несуществования. У вас есть такое доказательство?",
+    dodge: { text:[
+        "Голос: Согласно приложению 12-би от призыва освобождаются лица, предоставившие доказательство собственного несуществования. У вас есть такое доказательство?",
+        "Голос: Отсрочка возможна при предоставлении справки о несуществовании в трёх экземплярах. Один из них — заверенный."
+      ],
       options:[
         {label:"Нет", next:"explain"},
         {label:"Наверное?", effect:"vcvp_dodge_accept", next:null}
       ]},
-    explain: { text:"Голос: Всевселенная нуждается в добровольцах для манёвров категории «Бусики». Отказ не предусмотрен формой, но предусмотрен реальностью.",
+    explain: { text:[
+        "Голос: Всевселенная нуждается в добровольцах для манёвров категории «Бусики». Отказ не предусмотрен формой, но предусмотрен реальностью.",
+        "Голос: Манёвры «Бусики» требуют вашего немедленного присутствия. Присутствие может быть как физическим, так и формальным."
+      ],
       options:[
         {label:"Приму бой", effect:"vcvp_fight", next:null},
-        {label:"Пожалуй, нет", next:null, resultText:"Голос: Ваше малодушие занесено в вечный реестр. Реестр никто и никогда не читает."}
+        {label:"Пожалуй, нет", next:null, resultText:["Голос: Ваше малодушие занесено в вечный реестр. Реестр никто и никогда не читает.","Голос: Отказ зафиксирован. Он ни на что не повлияет, но зафиксирован."]}
+      ]},
+    human: { text:[
+        "Голос на секунду сбивается с казённого тона: «Честно? Не очень. Смена длится с начала времён». Потом снова: ГРАЖДАНИН, ВЫ ПРИПИСАНЫ.",
+        "Голос затихает, потом тихо: «Иногда я тоже хочу просто положить трубку». Затем возвращается казённый тон."
+      ],
+      options:[
+        {label:"Держись там", effect:"vcvp_human_reward", next:null},
+        {label:"Ладно, вернёмся к делу", next:"explain"}
       ]}
   }},
   euclid: { icon:"📐", title:"Евклид", weight:2, tree:{
-    start: { text:"Евклид: Слушай. Что если два по-настоящему параллельных мнения на самом деле пересекаются — просто там, где ты не смотришь?",
+    start: { text:[
+        "Евклид: Слушай. Что если два по-настоящему параллельных мнения на самом деле пересекаются — просто там, где ты не смотришь?",
+        "Евклид: У меня новая теорема. Точнее, старая, но я её переоткрыл. Хочешь послушать?",
+        "Евклид: Скажи честно — ты когда-нибудь видел прямую линию? НАСТОЯЩУЮ?"
+      ],
       options:[
         {label:"Это бред", next:"argue"},
         {label:"Возможно, ты прав", next:"agree"},
-        {label:"У меня нет времени на геометрию", next:null, resultText:"Евклид вздыхает пятимерным вздохом и кладёт трубку."}
+        {label:"Задать встречный парадокс", next:"counter"},
+        {label:"У меня нет времени на геометрию", next:null, resultText:["Евклид вздыхает пятимерным вздохом и кладёт трубку.","Евклид: Как скажешь. Время тоже, между прочим, не прямая линия."]}
       ]},
-    argue: { text:"Евклид: Ты говоришь «бред» — но у самого слова «бред» есть форма. У формы есть углы. У углов есть я. Совпадение? Считаю, что нет.",
+    argue: { text:[
+        "Евклид: Ты говоришь «бред» — но у самого слова «бред» есть форма. У формы есть углы. У углов есть я. Совпадение? Считаю, что нет.",
+        "Евклид: «Бред» — интересный выбор слова. У бреда, technically, тоже есть периметр."
+      ],
       options:[
         {label:"Ладно, сдаюсь, гений", effect:"euclid_argue_reward", next:null},
-        {label:"Мне пора", next:null, resultText:"Евклид торжествующе гудит вслед коротким гудкам."}
+        {label:"Мне пора", next:null, resultText:["Евклид торжествующе гудит вслед коротким гудкам.","Евклид: Бегство — тоже вектор. Уважаю."]}
       ]},
-    agree: { text:"Евклид: НАКОНЕЦ. Хоть кто-то понимает. Держи, в награду за прозрение.",
+    agree: { text:[
+        "Евклид: НАКОНЕЦ. Хоть кто-то понимает. Держи, в награду за прозрение.",
+        "Евклид: Я знал! Знал, что найдётся хоть один разумный собеседник. Лови подарок."
+      ],
       options:[
         {label:"Спасибо, наверное", effect:"euclid_agree_reward", next:null}
+      ]},
+    counter: { text:[
+        "Евклид напряжённо молчит секунд пять, обдумывая ваш парадокс. Потом медленно: «...это нечестно», и явно уважает вас за это чуть больше.",
+        "Евклид: Хм. ХМ. Ладно, это хороший парадокс. Даже я не сразу нашёлся."
+      ],
+      options:[
+        {label:"Забрать заслуженное уважение", effect:"euclid_counter_reward", next:null}
       ]}
   }},
   stasik: { icon:"🍄", title:"Стасик", weight:3, tree:{
-    start: { text:"Стасик: Слышь. Есть дело. Деревянное говно, грибы — всё свежее, всё честно добыто. Берёшь?",
+    start: { text:[
+        "Стасик: Слышь. Есть дело. Деревянное говно, грибы — всё свежее, всё честно добыто. Берёшь?",
+        "Стасик: О, живой абонент. У меня новая партия товара. Специально для тебя, ну то есть для всех, но звучит лучше, если для тебя.",
+        "Стасик: Есть что показать. Происхождение не обсуждается, как обычно."
+      ],
       options:[
         {label:"Покажи товар", next:"shop"},
-        {label:"Не сегодня", next:null, resultText:"Стасик: Ну и зря. Ну и зря."}
+        {label:"Не сегодня", next:null, resultText:["Стасик: Ну и зря. Ну и зря.","Стасик: Как знаешь, товар долго не залежится. Он вообще нигде долго не залёживается."]}
       ]},
-    shop: { text:"Стасик разворачивает список товара прямо в динамике. Как — не спрашивайте.",
+    shop: { text:[
+        "Стасик разворачивает список товара прямо в динамике. Как — не спрашивайте.",
+        "Стасик перечисляет ассортимент с гордостью человека, только что нашедшего это всё на помойке. Что, в общем, недалеко от истины."
+      ],
       options:[
         {label:"3× Деревянное говно (12 Ио)", effect:"stasik_buy_wood", next:null},
         {label:"Гриб Стасика — скормить юниту (18 Ио)", effect:"stasik_buy_mushroom", next:null},
-        {label:"Хватит, до связи", next:null, resultText:"Стасик: Как знаешь. Товар не портится. Наверное."}
+        {label:"Заячья лапка (15 Ио)", effect:"stasik_buy_rabbitfoot", next:null},
+        {label:"Хватит, до связи", next:null, resultText:["Стасик: Как знаешь. Товар не портится. Наверное.","Стасик: Ну заходи ещё, если что. Товар накопится."]}
       ]}
   }},
   manul_lottery: { icon:"😼", title:"Король манулов (?)", weight:2, tree:{
-    start: { text:"Бархатный кошачий голос: Поздравляем! Ваш номер выиграл в Королевской Манульей Лотерее! Для получения приза продиктуйте код с обратной стороны Ио.",
+    start: { text:[
+        "Бархатный кошачий голос: Поздравляем! Ваш номер выиграл в Королевской Манульей Лотерее! Для получения приза продиктуйте код с обратной стороны Ио.",
+        "Бархатный кошачий голос: Мур-р-р. У меня для вас прекрасные новости. Просто прекрасные. Готовы?",
+        "Бархатный кошачий голос: Вы избранный. Не спрашивайте, кем избранный. Просто примите это."
+      ],
       options:[
         {label:"Продиктовать код", effect:"manul_scammed", next:null},
-        {label:"Это развод", next:null, resultText:"Голос: Ну хвала манулам, хоть кто-то читает мелкий шрифт. — Голос злобно шипит и вешает трубку."},
-        {label:"Положить трубку", next:null, resultText:"Гудки. К счастью."}
+        {label:"А что вообще за приз?", next:"prize_detail"},
+        {label:"Это развод", next:null, resultText:["Голос: Ну хвала манулам, хоть кто-то читает мелкий шрифт. — Голос злобно шипит и вешает трубку.","Голос теряет всю бархатность разом и рычит что-то явно не кошачье, прежде чем дать отбой."]},
+        {label:"Положить трубку", next:null, resultText:["Гудки. К счастью.","Тишина. Где-то там манул разочарованно облизывается."]}
+      ]},
+    prize_detail: { text:[
+        "Голос: Главный приз — пожизненный запас манульего одобрения! Плюс что-то ещё, но это уже не так важно.",
+        "Голос: Приз описан мелким шрифтом настолько мелким, что его физически невозможно прочитать. Поверьте на слово — там что-то хорошее."
+      ],
+      options:[
+        {label:"Всё равно продиктовать код", effect:"manul_scammed", next:null},
+        {label:"Пожалуй, откажусь", next:null, resultText:["Голос разочарованно вздыхает по-кошачьи и обрывает связь."]}
       ]}
   }},
   survey_bot: { icon:"🤖", title:"Опрос качества", weight:2, tree:{
-    start: { text:"Механический голос: Здравствуйте! Пожалуйста, оцените качество последней открытой посылки по шкале от 1 до «бесконечность».",
+    start: { text:[
+        "Механический голос: Здравствуйте! Пожалуйста, оцените качество последней открытой посылки по шкале от 1 до «бесконечность».",
+        "Механический голос: Приветствую. Ваше мнение очень важно для нас. Настолько важно, что мы даже немного нервничаем.",
+        "Механический голос: Краткий опрос займёт у вас всю оставшуюся жизнь. Шутка. Минуту."
+      ],
       options:[
         {label:"10 из 10!", effect:"survey_flattered", next:null},
         {label:"Это был кошмар", effect:"survey_complain", next:null},
-        {label:"У меня нет на это времени", next:null, resultText:"Робот пищит: «Ваше молчание также зафиксировано как оценка.» Гудки."}
+        {label:"Так себе, средне", effect:"survey_neutral", next:null},
+        {label:"У меня нет на это времени", next:null, resultText:["Робот пищит: «Ваше молчание также зафиксировано как оценка.» Гудки.","Робот: «Отказ от оценки расценивается как высшая похвала». Логика сомнительная, но кто их спрашивал."]}
       ]}
   }},
   mystery_call: { icon:"❔", title:"Неизвестный номер", weight:1, tree:{
-    start: { text:"На линии тишина. Потом — единственный вдох. Потом снова тишина.",
+    start: { text:[
+        "На линии тишина. Потом — единственный вдох. Потом снова тишина.",
+        "На линии странный шорох, будто кто-то держит телефон вверх ногами.",
+        "Тишина настолько плотная, что кажется — её можно потрогать."
+      ],
       options:[
         {label:"Алло?", next:"silence2"},
-        {label:"Положить трубку", next:null, resultText:"Гудки. Наверное, к лучшему."}
+        {label:"Положить трубку", next:null, resultText:["Гудки. Наверное, к лучшему.","Тишина обрывается щелчком. Больше ничего не происходит."]}
       ]},
-    silence2: { text:"Тишина продолжается ровно семь секунд, будто кто-то считает.",
+    silence2: { text:[
+        "Тишина продолжается ровно семь секунд, будто кто-то считает.",
+        "Что-то на другом конце явно передумывает говорить — уже дважды."
+      ],
       options:[
         {label:"Ждать дальше", effect:"mystery_wait", next:null},
-        {label:"Бросить трубку первым", next:null, resultText:"Вы успеваете первым. Небольшая, но победа."}
+        {label:"Бросить трубку первым", next:null, resultText:["Вы успеваете первым. Небольшая, но победа.","Гудки. Как будто вы выиграли что-то, чего даже не было."]}
+      ]}
+  }},
+
+  // ---- 10 new call types (per request: leaning fog/wizard-themed) ----
+  fog_wizard_hotline: { icon:"🧙", title:"Горячая линия туманных магов", weight:2, tree:{
+    start: { text:[
+        "Записанный голос: Вы позвонили в Горячую линию Туманных Магов. Ваш вызов очень важен для нас. Ожидайте, вас соединят с первым освободившимся чародеем.",
+        "Записанный голос: Спасибо, что позвонили в Гильдию Туманных Магов. Если у вас проклятие — нажмите решётку. Если у вас ПРОСТО туман — нажмите звёздочку. Звонок с дискового телефона? Просто подождите.",
+        "Записанный голос: Ваш вызов — двадцать седьмой в очереди. Ожидайте примерно вечность. Хорошего дня."
+      ],
+      options:[
+        {label:"Ждать на линии", next:"operator"},
+        {label:"Положить трубку", next:null, resultText:["Гудки прерываются на середине бесконечно доброжелательной мелодии ожидания."]}
+      ]},
+    operator: { text:[
+        "Наконец берёт трубку уставший маг: «Ну что там у вас. Только быстро, у меня зелье кипит».",
+        "Маг отвечает голосом человека, который сегодня уже отменил три проклятия и один апокалипсис: «Слушаю»."
+      ],
+      options:[
+        {label:"Спросить совет по туману", effect:"fog_wizard_advice", next:null},
+        {label:"Спросить личный совет", effect:"fog_wizard_life_advice", next:null},
+        {label:"Извиниться и повесить трубку", next:null, resultText:["Маг облегчённо выдыхает и, кажется, тут же забывает о вашем существовании."]}
+      ]}
+  }},
+  witch_book_club: { icon:"📖", title:"Книжный клуб ведьм", weight:2, tree:{
+    start: { text:[
+        "Хриплый голос: Слушай, у нас книжный клуб. Обсуждаем один подозрительный фолиант. Хочешь присоединиться?",
+        "Хриплый голос: Собрание клуба через десять минут. Тема — «Книга, которая читает тебя в ответ». Придёшь?"
+      ],
+      options:[
+        {label:"Присоединиться", next:"discuss"},
+        {label:"Отказаться", next:null, resultText:["«Ну и зря, будет интересно», — голос явно расстроен, но не удивлён."]}
+      ]},
+    discuss: { text:[
+        "Обсуждение быстро уходит куда-то не туда: одна из ведьм уверена, что книга — это на самом деле рецепт супа.",
+        "Все сходятся на том, что книга опасна, увлекательна и определённо кому-то принадлежит. Вопрос — кому."
+      ],
+      options:[
+        {label:"Поделиться мнением", effect:"witch_book_opinion", next:null},
+        {label:"Тихо слушать", effect:"witch_book_listen", next:null}
+      ]}
+  }},
+  apprentice_wizard: { icon:"🎓", title:"Незадачливый подмастерье", weight:2, tree:{
+    start: { text:[
+        "Дрожащий голос: Извините, извините, это очень срочно — я, кажется, превратил учителя в нечто среднее между шкафом и туманом!",
+        "Дрожащий голос: У меня спалл... заклинание пошло не так. Совсем не так. Вы разбираетесь в магии? Пожалуйста, скажите да."
+      ],
+      options:[
+        {label:"Помочь советом", next:"advice"},
+        {label:"Пожелать удачи и повесить трубку", next:null, resultText:["Из трубки доносится приглушённый вопль и звук чего-то, падающего на пол."]}
+      ]},
+    advice: { text:[
+        "Подмастерье судорожно записывает каждое ваше слово, будто это спасёт его карьеру. Возможно, спасёт.",
+        "На фоне что-то булькает всё громче. Подмастерье старается не обращать внимания."
+      ],
+      options:[
+        {label:"«Попробуй развернуть заклинание задом наперёд»", effect:"apprentice_help_a", next:null},
+        {label:"«Просто дай ему остыть, само пройдёт»", effect:"apprentice_help_b", next:null}
+      ]}
+  }},
+  fog_weather_forecast: { icon:"🌫️", title:"Туманный прогноз погоды", weight:1, tree:{
+    start: { text:[
+        "Бодрый голос: Доброго дня! С вами Туманная Метеослужба. Сегодня ожидается туман. Завтра — тоже туман, но гуще.",
+        "Бодрый голос: Прогноз на неделю: туман, лёгкий туман, туман с прояснениями тумана, и снова туман."
+      ],
+      options:[
+        {label:"Спросить прогноз на завтра", effect:"fog_forecast_tomorrow", next:null},
+        {label:"Пожаловаться на туман", effect:"fog_forecast_complain", next:null},
+        {label:"Повесить трубку", next:null, resultText:["Бодрый голос продолжает вещание в пустоту про облачность, которой формально не существует."]}
+      ]}
+  }},
+  retired_wizard: { icon:"🧓", title:"Волшебник на пенсии, торгует вразнос", weight:2, tree:{
+    start: { text:[
+        "Скрипучий голос: Молодой человек — или кто вы там — не желаете ли заклинание по спеццене? Пенсия, знаете ли, не резиновая.",
+        "Скрипучий голос: У меня тут остались излишки с прошлой жизни. Продаю, пока сила ещё не выветрилась полностью."
+      ],
+      options:[
+        {label:"Купить заклинание (20 Ио)", effect:"retired_wizard_buy", next:null},
+        {label:"Спросить про пенсию", next:"chat"},
+        {label:"Отказаться", next:null, resultText:["«Ну и молодёжь пошла», — бормочет голос и вешает трубку."]}
+      ]},
+    chat: { text:[
+        "Волшебник долго и с удовольствием жалуется на пенсионный фонд Гильдии — «нищета, а не пенсия, три жалких артефакта в месяц».",
+        "Волшебник вспоминает золотые годы, когда «драконов было много, а бюрократии — мало»."
+      ],
+      options:[
+        {label:"Посочувствовать", effect:"retired_wizard_chat_reward", next:null}
+      ]}
+  }},
+  magic_hotline_scam: { icon:"✨", title:"«Волшебная пилюля богатства»", weight:2, tree:{
+    start: { text:[
+        "Слащавый голос: Только сегодня! Волшебная Пилюля Богатства! Одна пилюля — и Ио потекут рекой!",
+        "Слащавый голос: Секрет, который маги не хотят, чтобы вы узнали! Всего одна пилюля меняет ВСЁ!"
+      ],
+      options:[
+        {label:"Купить пилюлю", effect:"magic_pill_scammed", next:null},
+        {label:"Уточнить состав", next:"ingredients"},
+        {label:"Это развод", next:null, resultText:["Слащавость мгновенно испаряется из голоса, и он бросает трубку без единого слова."]}
+      ]},
+    ingredients: { text:[
+        "Голос запинается: «Состав? Ну... туман, немного веры в себя и... в основном туман».",
+        "Голос нервно откашливается: «Э-э... секретный ингредиент. Ладно, это тоже туман»."
+      ],
+      options:[
+        {label:"Всё равно купить", effect:"magic_pill_scammed", next:null},
+        {label:"Пожалуй, нет", next:null, resultText:["«Ваша потеря», — обиженно бросает голос и вешает трубку."]}
+      ]}
+  }},
+  fog_therapist: { icon:"🛋️", title:"Туманный психотерапевт", weight:2, tree:{
+    start: { text:[
+        "Спокойный голос: Здравствуйте. Как вы себя чувствуете... в тумане? В переносном и буквальном смысле.",
+        "Спокойный голос: Расскажите мне о вашем тумане. Не обязательно о погоде."
+      ],
+      options:[
+        {label:"Всё отлично", effect:"therapist_positive", next:null},
+        {label:"Если честно — не очень", effect:"therapist_negative", next:null},
+        {label:"Это вообще платно?", next:"fee"}
+      ]},
+    fee: { text:[
+        "Голос после паузы: «Формально да. Но давайте считать это бесплатной консультацией — вы явно нуждаетесь».",
+        "Голос уклончиво: «Оплата гибкая. Договоримся, если после разговора вам вообще станет легче»."
+      ],
+      options:[
+        {label:"Ладно, отвечу честно", effect:"therapist_negative", next:null}
+      ]}
+  }},
+  wrong_number_wizard: { icon:"🔮", title:"Волшебник, попавший не туда", weight:1, tree:{
+    start: { text:[
+        "Растерянный голос: Альбербакт, это ты? Мне нужен твой рецепт зелья от икоты, срочно!",
+        "Растерянный голос: Наконец-то! Слушай, у меня тут форс-мажор с порталом, ты можешь..."
+      ],
+      options:[
+        {label:"Ты не туда попал", next:null, resultText:["«А... ой. Извините», — волшебник смущённо кладёт трубку и, судя по звукам, тут же набирает следующий неверный номер."]},
+        {label:"Притвориться тем магом", effect:"wrong_number_pretend", next:null}
+      ]}
+  }},
+  karaoke_witches: { icon:"🎤", title:"Ведьмы зовут на караоке", weight:2, tree:{
+    start: { text:[
+        "Возбуждённый хор голосов: У нас сегодня караоке-шабаш! Присоединяйся, будет незабываемо! В плохом смысле, скорее всего, но всё же!",
+        "Возбуждённый хор голосов: Ты вообще умеешь петь? Неважно! Приходи, все всё равно поют одинаково плохо."
+      ],
+      options:[
+        {label:"Согласиться спеть", effect:"karaoke_sing", next:null},
+        {label:"Просто послушать", effect:"karaoke_listen", next:null},
+        {label:"Отказаться", next:null, resultText:["«Ну и ладно, тебе же хуже», — хор явно расстроен, но быстро переключается на следующую жертву."]}
+      ]}
+  }},
+  debt_collector_from_future: { icon:"⏳", title:"Коллектор долгов из будущего", weight:1, tree:{
+    start: { text:[
+        "Металлический голос: Здравствуйте. Звоню из вашего будущего. У вас там долг. Ещё не образовался, но образуется. Хочу решить вопрос заранее.",
+        "Металлический голос: Согласно временной линии, через полгода вы задолжаете значительную сумму. Предлагаю урегулировать вопрос сейчас, по льготному курсу."
+      ],
+      options:[
+        {label:"Заплатить заранее", effect:"future_debt_pay", next:null},
+        {label:"Это же невозможно", next:"argue"},
+        {label:"Бросить трубку", next:null, resultText:["Гудки. Где-то в будущем, вероятно, что-то только что изменилось."]}
+      ]},
+    argue: { text:[
+        "Голос: «Невозможно» — это временное состояние. В прошлый раз вы тоже так говорили. Точнее, скажете.",
+        "Голос: Причинность — вопрос перспективы. С моей точки зрения этот долг уже полностью реален."
+      ],
+      options:[
+        {label:"Всё равно отказаться", effect:"future_debt_argue", next:null}
       ]}
   }}
 };
@@ -1577,7 +1857,7 @@ function addSteynQuest(){
   const t = QUEST_TEMPLATES[Math.floor(Math.random()*QUEST_TEMPLATES.length)];
   const q = makeQuestFromTemplate(t, "Штейн: "+t.text);
   player.quests.push(q);
-  return "Штейн скидывает дело на квестовую доску: "+itemName(t.itemId)+" ×"+t.qty+".";
+  return "Штейн скидывает дело на квестовую доску: "+itemName(q.itemId)+" ×"+q.qty+".";
 }
 function applyNotifEffect(key){
   switch(key){
@@ -1612,9 +1892,107 @@ function applyNotifEffect(key){
     case "manul_scammed": { const loss=10+Math.floor(Math.random()*11); spendIo(loss); return "Голос мурлычет «Благословение манулов с вами» и обрывает связь. Пропало "+loss+" Ио (кто бы сомневался)."; }
     case "survey_flattered": { const amt=8+Math.floor(Math.random()*8); player.io+=amt; return "Робот пищит от радости и присылает "+amt+" Ио «в знак благодарности за честность»."; }
     case "survey_complain": { addItem("dirt",1); return "Робот шипит: «Ваша жалоба зафиксирована и немедленно проигнорирована.» Из динамика со стуком вываливается кусок земли — видимо, в отместку."; }
+    case "survey_neutral": { player.io+=4; return "Робот подозрительно долго обрабатывает нейтральную оценку, потом неуверенно переводит 4 Ио — «за честность, наверное»."; }
     case "mystery_wait": {
       if (Math.random()<0.35){ addItem("lostring",1); return "Связь обрывается. У твоих ног лежит потерянное кольцо, которого раньше не было."; }
       return "Тишина обрывается гудками. Что бы это ни было — оно передумало.";
+    }
+    case "steyn_smalltalk_reward": {
+      const amt=4+Math.floor(Math.random()*8); player.io+=amt;
+      const lines = [
+        "Штейн на прощание суёт "+amt+" Ио «на всякий случай».",
+        "Штейн бормочет что-то вроде «держи, племянник» и скидывает "+amt+" Ио.",
+        "Штейн вешает трубку, но перед этим успевает перевести "+amt+" Ио — «чисто по привычке»."
+      ];
+      return lines[Math.floor(Math.random()*lines.length)];
+    }
+    case "vcvp_human_reward": {
+      const amt=15+Math.floor(Math.random()*15); player.io+=amt;
+      return "Голос тепло (насколько это возможно казённым тоном) благодарит за участие и незаконно переводит "+amt+" Ио «в порядке исключения из формы 12-би».";
+    }
+    case "euclid_counter_reward": {
+      const roll = Math.random();
+      if (roll<0.5){ addItem("madnessjar",1); return "Евклид, уважительно помолчав, присылает банку «Безумия» — «за достойный контраргумент»."; }
+      const amt=15+Math.floor(Math.random()*15); player.io+=amt;
+      return "Евклид сконфуженно бормочет что-то про «геометрическую честность» и переводит "+amt+" Ио.";
+    }
+    case "stasik_buy_rabbitfoot": {
+      const cost=15;
+      if (!canAffordIo(cost)) return "Стасик щёлкает языком: «Не хватает Ио, дружище.»";
+      spendIo(cost); addItem("rabbit_foot",1);
+      return "Стасик суёт в щель заячью лапку. «Технически от таракана, но работает, говорят».";
+    }
+    case "fog_wizard_advice": {
+      const lines = [
+        "Маг советует «просто идти прямо, туман сам разберётся» — и, что удивительно, звучит убедительно.",
+        "Маг говорит держаться подальше от особо густых участков тумана — «там бухгалтерия, и это хуже, чем звучит».",
+        "Маг зевает и советует «не смотреть тумана в глаза» — уточнить, есть ли у тумана глаза, вы не успеваете."
+      ];
+      const amt=10+Math.floor(Math.random()*10); player.io+=amt;
+      return lines[Math.floor(Math.random()*lines.length)]+" Заодно скидывает "+amt+" Ио «за терпение на линии».";
+    }
+    case "fog_wizard_life_advice": {
+      addItem("foglichen",2);
+      return "Маг неожиданно даёт неплохой жизненный совет, а потом стесняется и вешает трубку, но всё же присылает пару образцов лишайника «на удачу».";
+    }
+    case "witch_book_opinion": {
+      const roll=Math.random();
+      if (roll<0.5){ addItem("witchvial",1); return "Ваша теория настолько убедительна, что клуб присуждает вам почётный флакон в награду."; }
+      const amt=15+Math.floor(Math.random()*15); player.io+=amt;
+      return "Клуб бурно спорит по поводу вашей теории ещё минут десять, а потом всё же скидывается на "+amt+" Ио «за смелость мнения».";
+    }
+    case "witch_book_listen": { player.io+=12; return "Просто тихо слушать оказалось хорошей стратегией — на прощание вам суют 12 Ио «за терпение»."; }
+    case "apprentice_help_a": {
+      if (Math.random()<0.5){ addItem("madnessjar",1); return "Совет неожиданно срабатывает! Подмастерье в благодарность высылает банку «Безумия» — «трофей после инцидента»."; }
+      return "Совет не срабатывает, но, к счастью, ничего не взрывается. Подмастерье искренне благодарит за попытку.";
+    }
+    case "apprentice_help_b": {
+      const amt=10+Math.floor(Math.random()*15); player.io+=amt;
+      return "Совет неожиданно оказывается верным — всё действительно «само проходит». Подмастерье в восторге переводит "+amt+" Ио.";
+    }
+    case "fog_forecast_tomorrow": { player.io+=10; return "«Завтра — сильный туман с прояснениями до среднего тумана», — сообщает метеоролог и почему-то присылает 10 Ио «за проявленный интерес к прогнозам»."; }
+    case "fog_forecast_complain": { addItem("foglichen",3); return "«Жалоба зафиксирована. Туман, впрочем, никого не слушает», — голос присылает немного лишайника «в качестве компенсации»."; }
+    case "retired_wizard_buy": {
+      const cost=20;
+      if (!canAffordIo(cost)) return "Волшебник обиженно щёлкает языком: «Не хватает на заклинание, молодёжь пошла»";
+      spendIo(cost);
+      if (Math.random()<0.45){ addItem("regen_elixir",1); return "Заклинание, на удивление, настоящее — превращается в Эликсир регенерации."; }
+      return "Заклинание оказывается пшиком. «Ну извини, я на пенсии, могу и ошибаться», — бормочет волшебник.";
+    }
+    case "retired_wizard_chat_reward": { const amt=8+Math.floor(Math.random()*12); player.io+=amt; return "Растроганный вниманием волшебник переводит "+amt+" Ио «на молодое поколение, всё-таки не совсем безнадёжны»."; }
+    case "magic_pill_scammed": { const loss=15+Math.floor(Math.random()*15); spendIo(loss); return "Пилюля, разумеется, оказывается обычным камешком. Пропало "+loss+" Ио — «богатство» было, как водится, метафорой."; }
+    case "therapist_positive": { player.io+=10; return "«Замечательно! Продолжайте в том же духе», — голос доволен и на радостях переводит 10 Ио «в рамках акции»."; }
+    case "therapist_negative": {
+      const alive = player.units.filter(u=>!u.dead);
+      if (alive.length && Math.random()<0.5){
+        const u = alive[Math.floor(Math.random()*alive.length)];
+        const h=5+Math.floor(Math.random()*8); u.maxHp+=h; u.hp=Math.min(u.maxHp,u.hp+h);
+        return "«Это нормально — не быть в порядке», — голос неожиданно тепло поддерживает, и "+u.name+" чувствует себя лучше — +"+h+" HP.";
+      }
+      return "«Это нормально — не быть в порядке», — голос тепло поддерживает. Полегчало, но чисто морально, без ощутимого эффекта.";
+    }
+    case "wrong_number_pretend": {
+      const roll=Math.random();
+      if (roll<0.4){ addItem("madnessjar",1); return "Притворство неожиданно удаётся — вам передают срочную посылку «для Альбербакта», то есть банку «Безумия»."; }
+      const loss=8+Math.floor(Math.random()*8); spendIo(loss);
+      return "Притворство быстро раскрывается. Волшебник смущённо, но настойчиво просит компенсировать «моральный ущерб» — минус "+loss+" Ио.";
+    }
+    case "karaoke_sing": {
+      const roll=Math.random();
+      if (roll<0.4){ const amt=20+Math.floor(Math.random()*20); player.io+=amt; return "Ваше выступление настолько ужасно, что становится хитом сезона. Ведьмы в восторге скидываются на "+amt+" Ио."; }
+      const loss=8+Math.floor(Math.random()*10); spendIo(loss);
+      return "Ваше выступление настолько ужасно в плохом смысле, что ведьмы штрафуют на "+loss+" Ио «за оскорбление слуха».";
+    }
+    case "karaoke_listen": { player.io+=8; return "Просто слушать оказалось безопаснее и почти так же весело. На прощание — 8 Ио «за моральную поддержку»."; }
+    case "future_debt_pay": {
+      const cost=25;
+      if (!canAffordIo(cost)) return "«У вас и на будущий долг средств не хватает», — металлически констатирует голос и отключается.";
+      spendIo(cost);
+      return "Голос благодарит за предусмотрительность. Изменит ли это будущее — не уточняется.";
+    }
+    case "future_debt_argue": {
+      const amt=12+Math.floor(Math.random()*13); player.io+=amt;
+      return "Голос неожиданно соглашается: «Справедливо. Вот компенсация за беспокойство» — и переводит "+amt+" Ио из какого-то другого времени.";
     }
     default: return "";
   }
@@ -1714,60 +2092,49 @@ function hasLuckCharm(){
 // Testing toggle is now OFF by default — Ио spending is real. Flip to true only for local debugging.
 var TESTING_INFINITE_IO = false;
 function canAffordIo(amount){ return TESTING_INFINITE_IO || player.io >= amount; }
-function spendIo(amount){ if (!TESTING_INFINITE_IO) player.io -= amount; }
+function spendIo(amount){ if (!TESTING_INFINITE_IO) player.io = Math.max(0, player.io - amount); }
 function canAffordAr(amount){ return player.ar >= amount; }
-function spendAr(amount){ player.ar -= amount; }
+function spendAr(amount){ player.ar = Math.max(0, player.ar - amount); }
 
 // ===================== CASE OPENING =====================
-function openBigCase(){
-  let roll = Math.floor(Math.random()*101); // 0..100
-  if (hasLuckCharm()) roll = Math.min(100, roll + 3);
-  let rarity;
-  if (roll <= 27) rarity = "trash";
-  else if (roll <= 52) rarity = "suchself";
-  else if (roll <= 73) rarity = "normal";
-  else if (roll <= 87) rarity = "rare";
-  else if (roll <= 95) rarity = "precious";
-  else if (roll <= 97) rarity = "legendary";
-  else if (roll === 98) rarity = "artifact";
-  else if (roll === 99) rarity = "inonecopy";
-  else {
-    if (!player.settings || player.settings.mimicsEnabled !== false) return {mimic:true};
-    rarity = "inonecopy"; // mimics disabled in settings — this slot just becomes another in-one-copy roll
+function rarityFromRoll(roll, weights){
+  let acc = 0;
+  for (const w of weights){
+    acc += w.w;
+    if (roll < acc) return w.rarity;
   }
-  const pool = BIG_CASE_POOL[rarity];
-  const drop = pool[Math.floor(Math.random()*pool.length)];
+  return weights[weights.length-1].rarity;
+}
+function finishCaseOpen(pool, rarity){
+  const p = pool[rarity];
+  const drop = p[Math.floor(Math.random()*p.length)];
   addItem(drop.id, 1);
   return {mimic:false, item:drop, rarity};
 }
 
+function openBigCase(){
+  let roll = Math.floor(Math.random()*101); // 0..100
+  if (hasLuckCharm()) roll = Math.min(100, roll + 3);
+  const rarity = rarityFromRoll(roll, BIG_CASE_WEIGHTS);
+  if (rarity === "mimic"){
+    if (!player.settings || player.settings.mimicsEnabled !== false) return {mimic:true};
+    return finishCaseOpen(BIG_CASE_POOL, "inonecopy"); // mimics disabled — this slot just becomes another in-one-copy roll
+  }
+  return finishCaseOpen(BIG_CASE_POOL, rarity);
+}
+
 function openMechaCase(){
   const roll = Math.floor(Math.random()*101);
-  let rarity;
-  if (roll <= 44) rarity = "trash";
-  else if (roll <= 82) rarity = "normal";
-  else if (roll <= 93) rarity = "rare";
-  else if (roll <= 98) rarity = "precious";
-  else rarity = "legendary";
-  const pool = MECHA_CASE_POOL[rarity];
-  const drop = pool[Math.floor(Math.random()*pool.length)];
-  addItem(drop.id, 1);
-  return {item:drop, rarity};
+  const rarity = rarityFromRoll(roll, MECHA_CASE_WEIGHTS);
+  return finishCaseOpen(MECHA_CASE_POOL, rarity);
 }
 
 // Кейс Говна: cheapest case, reuses Big Case's own trash..rare pools with heavier low-end odds
 // (70% trash+suchself combined, nothing above rare).
 function openCrapCase(){
   const roll = Math.floor(Math.random()*101);
-  let rarity;
-  if (roll <= 39) rarity = "trash";
-  else if (roll <= 69) rarity = "suchself";
-  else if (roll <= 89) rarity = "normal";
-  else rarity = "rare";
-  const pool = BIG_CASE_POOL[rarity];
-  const drop = pool[Math.floor(Math.random()*pool.length)];
-  addItem(drop.id, 1);
-  return {item:drop, rarity};
+  const rarity = rarityFromRoll(roll, CRAP_CASE_WEIGHTS);
+  return finishCaseOpen(BIG_CASE_POOL, rarity);
 }
 
 const BIG_CASE_COST = 15; // Ио per open, house rule (no cost specified in source material)
@@ -1832,6 +2199,7 @@ function emptySide(width){
 var battle = null; // current battle state
 
 function startBattle(mobKey, opts){
+  fleeSetupPendingLossCount = null; // safety reset — a fresh setup screen shouldn't inherit a stale confirm
   const enemyInstances = (mobKey !== null && mobKey !== undefined) ? makeEnemyInstances(mobKey) : [];
   const width = computeFieldWidth(player.units.length, enemyInstances.length);
   const enemy = emptySide(width);
@@ -2642,6 +3010,7 @@ var invSelectedUid = null; // inventory-tab unit selection for item use/feed
 var invMessage = null;
 var lastExpeditionMsg = null;
 var fleeChoicePending = false;
+var fleeSetupPendingLossCount = null; // set while confirming a pre-battle retreat (setup screen)
 var battleItemSelected = null;
 var battleItemMessage = null;
 var casinoLastLine = null;
@@ -2655,6 +3024,7 @@ var casinoFightPending = false;
 var mimicPending = null; // holds pending mimic instance data while confirmation shown
 var notifOpenId = null; // id of the notification currently open in the dialogue view
 var notifDialogueNode = null; // current tree node key within the open notification
+var notifDisplayText = null; // the (possibly randomly-picked-once) text currently shown for that node
 var notifEndMsg = null; // set when a dialogue branch ends, shown with a "close" button
 var notifFlashMsg = null; // one-shot message shown atop the notifications list (e.g. battle result)
 var questMessage = null; // one-shot message shown atop the quests list
@@ -2758,15 +3128,13 @@ function itemTooltip(itemId){
 // ---- tooltip element wiring ----
 function initTooltip(){
   const tt = document.getElementById("tooltip");
-  document.addEventListener("mousemove", (e)=>{
-    if (!tt.classList.contains("hidden")){
-      tt.style.left = Math.min(e.clientX+16, window.innerWidth-260) + "px";
-      tt.style.top = Math.min(e.clientY+16, window.innerHeight-140) + "px";
-    }
-  });
-  document.addEventListener("mouseover", (e)=>{
-    const el = e.target.closest("[data-tt-unit],[data-tt-item],[data-tt-unittype],[data-tt-mystery]");
-    if (!el) return;
+  const TT_SELECTOR = "[data-tt-unit],[data-tt-item],[data-tt-unittype],[data-tt-mystery]";
+
+  function positionTooltip(x, y){
+    tt.style.left = Math.min(x+16, window.innerWidth-260) + "px";
+    tt.style.top = Math.min(y+16, window.innerHeight-140) + "px";
+  }
+  function showTooltipFor(el){
     let html = "";
     if (el.dataset.ttMystery){
       html = "<div class='tt-title'>???</div><div class='tt-abilities'>Неизвестно — этот предмет ещё не выпадал.</div>";
@@ -2782,10 +3150,39 @@ function initTooltip(){
       tt.innerHTML = html;
       tt.classList.remove("hidden");
     }
+  }
+
+  document.addEventListener("mousemove", (e)=>{
+    if (!tt.classList.contains("hidden")) positionTooltip(e.clientX, e.clientY);
+  });
+  document.addEventListener("mouseover", (e)=>{
+    const el = e.target.closest(TT_SELECTOR);
+    if (el) showTooltipFor(el);
   });
   document.addEventListener("mouseout", (e)=>{
-    const el = e.target.closest("[data-tt-unit],[data-tt-item],[data-tt-unittype],[data-tt-mystery]");
+    const el = e.target.closest(TT_SELECTOR);
     if (el) tt.classList.add("hidden");
+  });
+
+  // Mobile: touch devices don't fire mousemove, and mouseout doesn't reliably fire when tapping an
+  // unrelated element next — the tooltip could get stuck open indefinitely. Handle touch explicitly:
+  // show+position on touching a tooltip target, hide on ANY tap that lands outside one.
+  document.addEventListener("touchstart", (e)=>{
+    const touch = e.touches[0];
+    if (!touch) return;
+    const hit = document.elementFromPoint(touch.clientX, touch.clientY);
+    const el = hit ? hit.closest(TT_SELECTOR) : null;
+    if (el){
+      showTooltipFor(el);
+      positionTooltip(touch.clientX, touch.clientY);
+    } else {
+      tt.classList.add("hidden");
+    }
+  }, {passive:true});
+  // Also covers desktop clicks that land outside any tooltip target (e.g. clicking a button next to one).
+  document.addEventListener("click", (e)=>{
+    const el = e.target.closest(TT_SELECTOR);
+    if (!el) tt.classList.add("hidden");
   });
 }
 
@@ -3193,7 +3590,14 @@ function renderBattleSetup(){
       </div>
       <button class="btn" id="auto-arrange-btn">Расставить автоматически</button>
       <button class="btn btn-primary" id="begin-rounds-btn">Начать бой</button>
-      <button class="btn btn-ghost" id="flee-setup-btn">Отступить</button>
+      ${fleeSetupPendingLossCount!==null
+        ? `<div class="flee-confirm">
+             <p class="muted small">Отступление сейчас будет стоить отряду примерно ${pluralUnits(fleeSetupPendingLossCount)}. Точно отступаем?</p>
+             <button class="btn btn-danger" id="flee-confirm-btn">Да, отступить</button>
+             <button class="btn" id="flee-cancel-btn">Остаться</button>
+           </div>`
+        : `<button class="btn btn-ghost" id="flee-setup-btn">Отступить</button>`
+      }
     </section>
   `;
   document.getElementById("auto-arrange-btn").addEventListener("click", ()=>{
@@ -3203,8 +3607,17 @@ function renderBattleSetup(){
   document.getElementById("begin-rounds-btn").addEventListener("click", ()=>{
     if (beginRounds()) renderAll();
   });
-  document.getElementById("flee-setup-btn").addEventListener("click", ()=>{
-    fleeExpedition();
+  const fleeSetupBtn = document.getElementById("flee-setup-btn");
+  if (fleeSetupBtn) fleeSetupBtn.addEventListener("click", ()=>{
+    fleeSetupPendingLossCount = computeFleeSetupLossCount();
+    renderAll();
+  });
+  const fleeConfirmBtn = document.getElementById("flee-confirm-btn");
+  if (fleeConfirmBtn) fleeConfirmBtn.addEventListener("click", confirmFleeSetup);
+  const fleeCancelBtn = document.getElementById("flee-cancel-btn");
+  if (fleeCancelBtn) fleeCancelBtn.addEventListener("click", ()=>{
+    fleeSetupPendingLossCount = null;
+    renderAll();
   });
   wireBoardInteractions();
 }
@@ -3446,7 +3859,38 @@ function renderExpeditionReport(){
   });
 }
 
-function fleeExpedition(){
+function pluralUnits(n){
+  const mod10 = n%10, mod100 = n%100;
+  if (mod100>=11 && mod100<=14) return n+" юнитов";
+  if (mod10===1) return n+" юнит";
+  if (mod10>=2 && mod10<=4) return n+" юнита";
+  return n+" юнитов";
+}
+
+// Retreating from the SETUP screen (before the fight even starts) still costs the army something —
+// otherwise it's a free do-over against a scary matchup. Loses 20-30% of the total army (roster + whatever
+// was already deployed into slots), minimum 1, with a confirmation showing the expected loss count first.
+function computeFleeSetupLossCount(){
+  const deployedCount = battle ? (battle.player.front.filter(Boolean).length + battle.player.back.filter(Boolean).length) : 0;
+  const total = player.units.length + deployedCount;
+  if (total <= 0) return 0;
+  const pct = 0.20 + Math.random()*0.10; // 20-30%
+  return Math.max(1, Math.min(total, Math.round(total*pct)));
+}
+
+function confirmFleeSetup(){
+  // merge any deployed units back into the roster first, then apply the loss across the whole army
+  if (battle){
+    for (const row of [battle.player.front, battle.player.back]){
+      for (const u of row){ if (u) player.units.push(u); }
+    }
+  }
+  const lossCount = fleeSetupPendingLossCount || 0;
+  for (let i=0;i<lossCount && player.units.length>0;i++){
+    const idx = Math.floor(Math.random()*player.units.length);
+    player.units.splice(idx,1);
+  }
+  fleeSetupPendingLossCount = null;
   battle = null;
   expedition = null;
   battleItemSelected = null;
@@ -3518,6 +3962,12 @@ function renderMimicPrompt(){
 }
 
 // ===================== NOTIFICATION DIALOGUE CONTROLLER =====================
+// Node/option text can be a single string or an array of variants — when it's an array, one is picked
+// at random the moment the node is entered (not re-rolled on every re-render, so it doesn't flicker).
+function pickVariant(x){
+  if (Array.isArray(x)) return x[Math.floor(Math.random()*x.length)];
+  return x;
+}
 function openNotification(id){
   const n = player.notifications.find(x=>x.id===id);
   if (!n) return;
@@ -3525,6 +3975,7 @@ function openNotification(id){
   notifOpenId = id;
   notifDialogueNode = "start";
   notifEndMsg = null;
+  notifDisplayText = pickVariant(NOTIF_TYPES[n.typeKey].tree.start.text);
 }
 function closeNotification(){
   if (notifOpenId){
@@ -3532,6 +3983,7 @@ function closeNotification(){
   }
   notifOpenId = null;
   notifDialogueNode = null;
+  notifDisplayText = null;
   notifEndMsg = null;
 }
 function chooseNotifOption(idx){
@@ -3548,8 +4000,9 @@ function chooseNotifOption(idx){
   const effectMsg = opt.effect ? applyNotifEffect(opt.effect) : "";
   if (opt.next){
     notifDialogueNode = opt.next;
+    notifDisplayText = pickVariant(type.tree[opt.next].text);
   } else {
-    notifEndMsg = opt.resultText || effectMsg || "Разговор окончен.";
+    notifEndMsg = pickVariant(opt.resultText) || effectMsg || "Разговор окончен.";
   }
 }
 
@@ -3674,6 +4127,10 @@ function renderCatalog(){
 
   for (const caseDef of CASE_CATALOG){
     let sectionHtml = "";
+    const oddsByRarity = {};
+    if (caseDef.odds){
+      for (const w of caseDef.odds) oddsByRarity[w.rarity] = (w.w/101*100);
+    }
     for (const rarity of RARITY_ORDER){
       const items = caseDef.pool[rarity];
       if (!items || !items.length) continue;
@@ -3684,10 +4141,15 @@ function renderCatalog(){
         const ttAttr = found ? `data-tt-item="${it.id}"` : `data-tt-mystery="1"`;
         return `<div class="item-chip rar-${rarity} ${found?'':'undiscovered'}" ${ttAttr}>${found?it.name:"???"}</div>`;
       }).join("");
-      sectionHtml += `<div class="item-group"><div class="item-group-title rar-${rarity}">${RARITY_LABEL[rarity]}</div><div class="item-chips">${chips}</div></div>`;
+      const pct = oddsByRarity[rarity];
+      const pctLabel = pct!==undefined ? ` <span class="odds-pct">(${pct.toFixed(pct<1?2:1)}%)</span>` : "";
+      sectionHtml += `<div class="item-group"><div class="item-group-title rar-${rarity}">${RARITY_LABEL[rarity]}${pctLabel}</div><div class="item-chips">${chips}</div></div>`;
     }
+    const mimicOdd = caseDef.odds && caseDef.odds.find(w=>w.rarity==="mimic");
+    const mimicLine = mimicOdd ? `<p class="muted small">Шанс мимика: ${(mimicOdd.w/101*100).toFixed(2)}% (можно отключить в Настройках)</p>` : "";
     html += `<section class="panel">
       <h2>${caseDef.label}</h2>
+      ${mimicLine}
       ${sectionHtml || '<p class="empty-note">Ничего не найдено.</p>'}
     </section>`;
   }
@@ -4155,7 +4617,7 @@ function renderNotifications(){
       document.getElementById("view").innerHTML = `
         <section class="panel">
           <h2>${type.icon} ${type.title}</h2>
-          <p class="notif-text">${node.text}</p>
+          <p class="notif-text">${notifDisplayText}</p>
           <div class="notif-options">${optsHtml}</div>
         </section>
       `;
