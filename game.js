@@ -220,15 +220,15 @@ const ITEM_EFFECTS = {
 // Units with a trailing " *" in the name were invented by Claude.
 const UNIT_DB = {
   brave_warrior: {id:"brave_warrior", name:"Бравый воин", hp:3, dmg:2, shld:1, abilities:[]},
-  bob: {id:"bob", name:"Боб", hp:3, dmg:2, shld:0, abilities:[]},
+  bob: {id:"bob", name:"Боб", hp:3, dmg:2, shld:0, abilities:[{type:"scale_hp_per_ally", unitId:"bob", amount:3}]},
   gnome_unit: {id:"gnome_unit", name:"Садовый гномик", hp:3, dmg:3, shld:0, abilities:[{type:"on_death_drop", item:"clay"}]},
   robocandy: {id:"robocandy", name:"Робоконфетка", hp:3, dmg:2, shld:0, abilities:[]},
   jyj: {id:"jyj", name:"Жыж", hp:4, dmg:2, shld:0, abilities:[{type:"post_battle_full_heal"}]},
-  scarecrow: {id:"scarecrow", name:"Пугало", hp:4, dmg:2, shld:1, abilities:[]},
+  scarecrow: {id:"scarecrow", name:"Пугало", hp:4, dmg:2, shld:1, abilities:[{type:"aura_shield_adjacent", shld:1}]},
   figure: {id:"figure", name:"Фигурка", hp:2, dmg:2, shld:1, abilities:[{type:"post_battle_heal_adjacent", amount:2}]},
   who: {id:"who", name:"Кто", hp:8, dmg:3, shld:0, abilities:[]},
   catapult: {id:"catapult", name:"Катапульта", hp:6, dmg:4, shld:0, abilities:[{type:"ranged_attack"}]},
-  beaver_fort: {id:"beaver_fort", name:"Бобровое укрепление", hp:5, dmg:2, shld:2, abilities:[]},
+  beaver_fort: {id:"beaver_fort", name:"Бобровое укрепление", hp:5, dmg:2, shld:3, abilities:[]},
   pyroach: {id:"pyroach", name:"Пирокан", hp:3, dmg:4, shld:1, abilities:[]},
   something_alive: {id:"something_alive", name:"Что-то живое", hp:7, dmg:2, shld:0, abilities:[]},
   bard: {id:"bard", name:"Бард", hp:5, dmg:2, shld:0, abilities:[{type:"periodic_heal", every:3, amount:5}]},
@@ -288,7 +288,7 @@ const RECIPES = [
 
   // normal tier
   {id:"r_pot", inputs:[{id:"clay",qty:1},{id:"dirt",qty:1}], tools:["oven"], output:{item:"pot", qty:1}, label:"Печь(инструм.) + Кусок глины + Кусок земли = Горшок"},
-  {id:"r_jyj", inputs:[{id:"yellowpaste",qty:1},{id:"waterchunk",qty:1}], tools:[], output:{unit:"jyj", qty:1}, label:"Желтая зубная паста + Кусок воды = Жыж"},
+  {id:"r_jyj", inputs:[{id:"yellowpaste",qty:1},{id:"waterchunk",qty:1}], tools:[], output:{unit:"jyj", qty:2}, label:"Желтая зубная паста + Кусок воды = Жыж x2 (было x1)", homebrew:true},
   {id:"r_scarecrow", inputs:[{id:"halloweenpumpkin",qty:1},{id:"stick",qty:1},{id:"rottape",qty:1}], tools:[], output:{unit:"scarecrow", qty:1}, label:"Хэллоуинская тыква + Палка + Гнилая изолента = Пугало"},
   {id:"r_readysausage", inputs:[{id:"sausage",qty:1}], tools:["cookguide","grill"], output:{item:"readysausage", qty:1}, label:"Сарделька + Гид по кулинарии(инстр.) + Гриль(инстр.) = Готовая сарделька"},
   {id:"r_steak", inputs:[{id:"meat",qty:1}], tools:["grill"], output:{item:"steak", qty:1}, label:"Кусок мяса + Гриль(инстр.) = Стейк"},
@@ -297,7 +297,7 @@ const RECIPES = [
   {id:"r_robocandy", inputs:[{id:"candy",qty:1},{id:"wires",qty:1}], tools:[], output:{unit:"robocandy", qty:2}, label:"Конфетка + Провода = Робоконфетка x2"},
 
   // rare tier
-  {id:"r_who", inputs:[{id:"rotpumpkin",qty:1},{id:"stick",qty:1},{id:"woodturd",qty:1}], tools:[], output:{unit:"who", qty:1}, label:"Гнилая тыква + Палка + Деревянное говно = Кто"},
+  {id:"r_who", inputs:[{id:"rotpumpkin",qty:1},{id:"woodturd",qty:1}], tools:[], output:{unit:"who", qty:1}, label:"Гнилая тыква + Деревянное говно = Кто (рецепт упрощён — раньше требовалась ещё и Палка)", homebrew:true},
   {id:"r_catapult", inputs:[{id:"board",qty:1},{id:"brick",qty:1},{id:"potato",qty:1}], tools:[], output:{unit:"catapult", qty:1}, label:"Доска + Кирпич + Картошка = Катапульта * (адаптировано, без деталей меха)", homebrew:true},
   {id:"r_elite_robocandy", inputs:[], tools:["upgradebook"], requiresUnit:"robocandy", consumeUnit:1, output:{unit:"elite_robocandy", qty:1}, label:"Робоконфетка + Магическая книга улучшения(инстр.) = Элитная робоконфетка"},
   {id:"r_cactusyan_upgrade", inputs:[{id:"cactusthorn",qty:1}], tools:[], requiresUnit:"cactusyan_classic", consumeUnit:1, output:{unit:"cactusyan_nonclassic", qty:1}, label:"Классический кактусян + Колючка кактуса = Неклассический кактусян"},
@@ -307,7 +307,7 @@ const RECIPES = [
   {id:"r_bard", inputs:[{id:"guy",qty:1},{id:"mandolin",qty:1}], tools:[], output:{unit:"bard", qty:1}, label:"Чел + Мандолина = Бард"},
 
   // precious tier
-  {id:"r_mage", inputs:[{id:"guy",qty:1},{id:"weakamulet",qty:1},{id:"cloth",qty:1}], tools:[], output:{unit:"mage", qty:1}, label:"Чел + Слабый магический амулет + Ткань = Маг"},
+  {id:"r_mage", inputs:[{id:"guy",qty:1},{id:"weakamulet",qty:1}], tools:[], output:{unit:"mage", qty:1}, label:"Чел + Слабый магический амулет = Маг (рецепт упрощён — раньше требовалась ещё и Ткань)", homebrew:true},
   {id:"r_statue", inputs:[{id:"marblecube",qty:1},{id:"processor",qty:1}], tools:["revivebook"], output:{unit:"statue", qty:1}, label:"Обработочная машина + Куб из мрамора + Магическая книга оживления(инстр.) = Статуя"},
   {id:"r_microforge", inputs:[{id:"sandchunk",qty:1},{id:"brick",qty:1}], tools:["oven"], output:{item:"microforge", qty:1}, label:"Печь(инстр.) + КУСОК ПЕСКА + Кирпич = Микрокузница * (адаптировано)", homebrew:true},
   {id:"r_jack", inputs:[{id:"cloth",qty:1},{id:"halloweenpumpkin",qty:1}], tools:[], requiresUnit:"scarecrow", consumeUnit:1, output:{unit:"jack", qty:1}, label:"Пугало + Ткань + Хэллоуинская тыква = Джек"},
@@ -624,34 +624,55 @@ const MARTYN_LINES = [
 
 
 const SEWER_MOBS = {
-  1: {name:"Псевдосфера псевдокоричневой псевдомассы", hp:19, dmg:4, shld:0},
-  2: {name:"Плохая вода", hp:20, dmg:2, shld:0, flag:"badwater"},
-  3: {name:"Неевклид", hp:25, dmg:4, shld:2},
-  4: {name:"Пересекающиеся Прямые", hp:14, dmg:2, shld:2, pack:[
-        {name:"Прямая",hp:7,dmg:2,shld:1}, {name:"Прямая",hp:7,dmg:2,shld:1}
+  1: {name:"Псевдосфера псевдокоричневой псевдомассы", hp:19, dmg:4, shld:0, moveChance:15},
+  2: {name:"Плохая вода", hp:20, dmg:2, shld:0, flag:"badwater", moveChance:40},
+  3: {name:"Неевклид", hp:25, dmg:4, shld:2, moveChance:30},
+  4: {name:"Пересекающиеся Прямые", hp:14, dmg:2, shld:2, moveChance:25, pack:[
+        {name:"Прямая",hp:7,dmg:2,shld:1,moveChance:25}, {name:"Прямая",hp:7,dmg:2,shld:1,moveChance:25}
       ]},
-  5: {name:"Кривая", hp:5, dmg:3, shld:0},
-  6: {name:"Странная", hp:19, dmg:3, shld:0},
-  7: {name:"Клочья гиперболического мха", hp:12, dmg:2, shld:1, pack:[
-        {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0}, {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0}, {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0}
+  5: {name:"Кривая", hp:5, dmg:3, shld:0, moveChance:50},
+  6: {name:"Странная", hp:19, dmg:3, shld:0, moveChance:45},
+  7: {name:"Клочья гиперболического мха", hp:12, dmg:2, shld:1, moveChance:55, pack:[
+        {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0,moveChance:55}, {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0,moveChance:55}, {name:"Клочок гиперболического мха",hp:4,dmg:2,shld:0,moveChance:55}
       ]},
-  8: {name:"Бочка", hp:30, dmg:0, shld:3, flag:"barrel"},
-  9: {name:"Парадокс", hp:40, dmg:2, shld:2, boss:true, flag:"paradox", scalingDmgPerKill:1},
-  10:{name:"Вестники Евклида", hp:6, dmg:2, shld:1, pack:[
-        {name:"Вестник Евклида",hp:2,dmg:2,shld:0}, {name:"Вестник Евклида",hp:2,dmg:2,shld:0}, {name:"Вестник Евклида",hp:2,dmg:2,shld:0}
+  8: {name:"Бочка", hp:30, dmg:0, shld:3, flag:"barrel", moveChance:0},
+  9: {name:"Парадокс", hp:40, dmg:2, shld:2, boss:true, flag:"paradox", scalingDmgPerKill:1, moveChance:20},
+  10:{name:"Вестники Евклида", hp:6, dmg:2, shld:1, moveChance:100, pack:[
+        {name:"Вестник Евклида",hp:2,dmg:2,shld:0,moveChance:100}, {name:"Вестник Евклида",hp:2,dmg:2,shld:0,moveChance:100}, {name:"Вестник Евклида",hp:2,dmg:2,shld:0,moveChance:100}
       ]},
-  11:{name:"Евклид", hp:50, dmg:4, shld:2, boss:true, flag:"euclid"},
-  12:{name:"Александр", hp:11, dmg:4, shld:1}
+  11:{name:"Евклид", hp:50, dmg:4, shld:2, boss:true, flag:"euclid", moveChance:20},
+  12:{name:"Александр", hp:11, dmg:4, shld:1, moveChance:35},
+  // ---- Round 13: mixed-theme combo fights (not everything needs to be thematically related) ----
+  13:{name:"Странная и Кривая устроили дуэль", hp:18, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Странная",hp:14,dmg:2,shld:0,moveChance:45}, {name:"Кривая",hp:4,dmg:2,shld:0,moveChance:50}
+      ]},
+  14:{name:"Александр против Псевдосферы", hp:21, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Александр",hp:8,dmg:3,shld:1,moveChance:35}, {name:"Псевдосфера псевдокоричневой псевдомассы",hp:13,dmg:3,shld:0,moveChance:15}
+      ]},
+  15:{name:"Неевклид, Прямая и Вестник сговорились", hp:20, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Неевклид",hp:12,dmg:3,shld:1,moveChance:30}, {name:"Прямая",hp:6,dmg:2,shld:1,moveChance:25}, {name:"Вестник Евклида",hp:2,dmg:2,shld:0,moveChance:100}
+      ]},
+  // ---- Round 13: ranged enemies (paired with a melee escort so a roster with zero ranged units of its
+  // own still has something reachable to fight — a lone backline-only enemy would otherwise be
+  // undamageable by front-row units and stalemate forever) ----
+  16:{name:"Сильный плевальщик и охрана", hp:30, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Сильный плевальщик",hp:18,dmg:4,shld:1,moveChance:30,backline:true,abilities:[{type:"ranged_attack"}]},
+        {name:"Александр",hp:8,dmg:3,shld:1,moveChance:35}
+      ]},
+  17:{name:"Мистер Понос и свита", hp:25, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Мистер Понос",hp:15,dmg:5,shld:0,moveChance:25,backline:true,abilities:[{type:"ranged_attack"}]},
+        {name:"Кривая",hp:5,dmg:3,shld:0,moveChance:50}
+      ]}
 };
 
 const SEWER_ROUTES = [
-  [4,5,6,2,3],
-  [1,2,7,10,3],
-  [6,1,6,8,7],
-  [2,4,5,10,11],
-  [6,1,5,9,12],
+  [4,5,16,2,3],
+  [1,2,13,10,3],
+  [6,1,17,8,7],
+  [2,4,14,10,11],
+  [6,1,15,9,12],
   [5,1,3,12,10],
-  [3,6,10,11,8]
+  [3,16,10,11,8]
 ];
 
 function rollSewerRewards(flags, sumDmgTaken){
@@ -1007,36 +1028,55 @@ console.log("data module ok", Object.keys(ITEM_DB).length, "items,", Object.keys
 // of picked from a fixed list like the sewer's SEWER_ROUTES.
 const FARLANDS_MOBS = {
   // tier 1
-  f1: {name:"Парочка туманных зайцев-провокаторов", hp:14, dmg:3, shld:0, pack:[
-        {name:"Туманный заяц-провокатор",hp:7,dmg:3,shld:0}, {name:"Туманный заяц-провокатор",hp:7,dmg:3,shld:0}
+  f1: {name:"Парочка туманных зайцев-провокаторов", hp:14, dmg:3, shld:0, moveChance:80, pack:[
+        {name:"Туманный заяц-провокатор",hp:7,dmg:3,shld:0,moveChance:80}, {name:"Туманный заяц-провокатор",hp:7,dmg:3,shld:0,moveChance:80}
       ]},
-  f2: {name:"Мшистый пень с характером", hp:15, dmg:2, shld:1},
-  f3: {name:"Летающая шишка-камикадзе", hp:9, dmg:4, shld:0},
-  f4: {name:"Блуждающий огонёк-должник", hp:13, dmg:2, shld:1},
-  f5: {name:"Гриб-подслушиватель", hp:14, dmg:2, shld:1},
+  f2: {name:"Мшистый пень с характером", hp:15, dmg:2, shld:1, moveChance:5},
+  f3: {name:"Летающая шишка-камикадзе", hp:9, dmg:4, shld:0, moveChance:70},
+  f4: {name:"Блуждающий огонёк-должник", hp:13, dmg:2, shld:1, moveChance:60},
+  f5: {name:"Гриб-подслушиватель", hp:14, dmg:2, shld:1, moveChance:10},
   // tier 2
-  f6: {name:"Лесной торговец краденым туманом", hp:24, dmg:4, shld:1},
-  f7: {name:"Одичавший садовый гном-мародёр", hp:23, dmg:5, shld:1},
-  f8: {name:"Дерево со слишком многими мнениями", hp:28, dmg:3, shld:2},
-  f9: {name:"Стая туманных ворон-бухгалтеров", hp:24, dmg:0, shld:0, flag:"crowaudit", scalingDmgPerKill:1, pack:[
-        {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0}, {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0}, {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0}
+  f6: {name:"Лесной торговец краденым туманом", hp:24, dmg:4, shld:1, moveChance:35},
+  f7: {name:"Одичавший садовый гном-мародёр", hp:23, dmg:5, shld:1, moveChance:45},
+  f8: {name:"Дерево со слишком многими мнениями", hp:28, dmg:3, shld:2, moveChance:5},
+  f9: {name:"Стая туманных ворон-бухгалтеров", hp:24, dmg:0, shld:0, flag:"crowaudit", scalingDmgPerKill:1, moveChance:75, pack:[
+        {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0,moveChance:75}, {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0,moveChance:75}, {name:"Туманная ворона-бухгалтер",hp:8,dmg:2,shld:0,moveChance:75}
       ]},
-  f10:{name:"Олень о восьми ногах, как минимум", hp:30, dmg:4, shld:1},
-  // tier 3
-  f11:{name:"Ходячий, подозрительно осведомлённый валежник", hp:38, dmg:5, shld:1},
-  f12:{name:"Туманная гончая о трёх головах (каждая врёт)", hp:44, dmg:0, shld:0, pack:[
-        {name:"Левая голова гончей",hp:14,dmg:3,shld:0}, {name:"Центральная голова гончей",hp:16,dmg:4,shld:1}, {name:"Правая голова гончей",hp:14,dmg:3,shld:0}
+  f10:{name:"Олень о восьми ногах, как минимум", hp:30, dmg:4, shld:1, moveChance:55},
+  // tier 3 (harder — this is where the new ranged enemies live)
+  f11:{name:"Ходячий, подозрительно осведомлённый валежник", hp:38, dmg:5, shld:1, moveChance:40},
+  f12:{name:"Туманная гончая о трёх головах (каждая врёт)", hp:44, dmg:0, shld:0, moveChance:50, pack:[
+        {name:"Левая голова гончей",hp:14,dmg:3,shld:0,moveChance:50}, {name:"Центральная голова гончей",hp:16,dmg:4,shld:1,moveChance:50}, {name:"Правая голова гончей",hp:14,dmg:3,shld:0,moveChance:50}
       ]},
-  f13:{name:"Вендиго на пенсии, но всё ещё голодный", hp:44, dmg:5, shld:2},
+  f13:{name:"Вендиго на пенсии, но всё ещё голодный", hp:44, dmg:5, shld:2, moveChance:25},
+  f16:{name:"Дух снайпера и телохранитель", hp:34, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Дух снайпера",hp:17,dmg:6,shld:0,moveChance:45,backline:true,abilities:[{type:"ranged_attack"}]},
+        {name:"Мшистый пень с характером",hp:14,dmg:2,shld:1,moveChance:5}
+      ]},
+  f17:{name:"Повелитель камней и страж", hp:47, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Повелитель камней",hp:26,dmg:5,shld:1,moveChance:20,backline:true,abilities:[{type:"ranged_attack"}]},
+        {name:"Гриб-подслушиватель",hp:12,dmg:2,shld:1,moveChance:10}
+      ]},
+  f18:{name:"Кукушка-артиллеристка и часовой", hp:31, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Кукушка-артиллеристка",hp:18,dmg:5,shld:0,moveChance:50,backline:true,abilities:[{type:"ranged_attack"}]},
+        {name:"Блуждающий огонёк-должник",hp:9,dmg:2,shld:0,moveChance:60}
+      ]},
+  // ---- Round 13: mixed-theme combo packs ----
+  f19:{name:"Мшистый пень и Летающая шишка сговорились", hp:18, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Мшистый пень с характером",hp:11,dmg:2,shld:1,moveChance:5}, {name:"Летающая шишка-камикадзе",hp:7,dmg:3,shld:0,moveChance:70}
+      ]},
+  f20:{name:"Гриб, Дерево и Огонёк устроили привал", hp:30, dmg:0, shld:0, moveChance:0, pack:[
+        {name:"Гриб-подслушиватель",hp:8,dmg:2,shld:1,moveChance:10}, {name:"Дерево со слишком многими мнениями",hp:15,dmg:2,shld:1,moveChance:5}, {name:"Блуждающий огонёк-должник",hp:7,dmg:2,shld:0,moveChance:60}
+      ]},
   // bosses
-  fb1:{name:"Лесная Ведьма Тумана", hp:48, dmg:5, shld:2, boss:true, flag:"fogwitch"},
-  fb2:{name:"Прадед Рогов, Древний Патриарх Оленей", hp:55, dmg:5, shld:3, boss:true, flag:"antlerlord", scalingDmgPerKill:1}
+  fb1:{name:"Лесная Ведьма Тумана", hp:48, dmg:5, shld:2, boss:true, flag:"fogwitch", moveChance:20},
+  fb2:{name:"Прадед Рогов, Древний Патриарх Оленей", hp:55, dmg:5, shld:3, boss:true, flag:"antlerlord", scalingDmgPerKill:1, moveChance:10}
 };
 
 function generateFarlandsRoute(){
-  const tier1 = ["f1","f2","f3","f4","f5"];
-  const tier2 = ["f6","f7","f8","f9","f10"];
-  const tier3 = ["f11","f12","f13"];
+  const tier1 = ["f1","f2","f3","f4","f5","f19"];
+  const tier2 = ["f6","f7","f8","f9","f10","f20"];
+  const tier3 = ["f11","f12","f13","f16","f17","f18"];
   const bosses = ["fb1","fb2"];
   function pickN(arr,n){
     const pool = [...arr];
@@ -2034,7 +2074,9 @@ function makeEnemyInstances(mobKey){
       boss: false,
       flag: null, // reward flags are read off the route's mobKey table entry, not per pack-member instances
       scalingDmgPerKill: p.scalingDmgPerKill || 0,
-      abilities: [],
+      abilities: p.abilities || [],
+      moveChance: p.moveChance != null ? p.moveChance : 35,
+      backline: !!p.backline,
       turnCounter: 0,
       dead: false
     }));
@@ -2050,7 +2092,9 @@ function makeEnemyInstances(mobKey){
     boss: !!base.boss,
     flag: base.flag || null,
     scalingDmgPerKill: base.scalingDmgPerKill || 0,
-    abilities: [],
+    abilities: base.abilities || [],
+    moveChance: base.moveChance != null ? base.moveChance : 35,
+    backline: !!base.backline,
     turnCounter: 0,
     dead: false
   }];
@@ -2185,10 +2229,30 @@ function computeFieldWidth(playerCount, enemyCount){
   return Math.min(MAX_FIELD_WIDTH, Math.max(MIN_FIELD_WIDTH, playerCount, enemyCount));
 }
 
-// Enemies are centered in the field so front-row column-range targeting (±1) actually reaches them
-// instead of leaving most of a wide player army stuck unable to hit a lone foe parked at column 0.
+// Enemies used to always be centered so front-row column-range targeting (±1) could reach them — but that
+// made every fight feel the same. Now placement is randomized per battle (per explicit request), which can
+// occasionally strand a far-column player unit against a lone off-center foe — an accepted tradeoff for variety.
 function centeredStart(width, count){
   return Math.max(0, Math.floor((width-count)/2));
+}
+function randomDistinctSlots(width, count){
+  const indices = [];
+  for (let i=0;i<width;i++) indices.push(i);
+  for (let i=indices.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    const tmp=indices[i]; indices[i]=indices[j]; indices[j]=tmp;
+  }
+  return indices.slice(0, Math.min(count, width));
+}
+// Places a list of enemy instances onto random front/back columns — `inst.backline` sends a ranged unit
+// to the back row instead of the front.
+function placeEnemies(enemy, width, instances){
+  const frontList = instances.filter(inst=>!inst.backline);
+  const backList = instances.filter(inst=>inst.backline);
+  const frontSlots = randomDistinctSlots(width, frontList.length);
+  frontList.forEach((inst,i)=>{ enemy.front[frontSlots[i]] = inst; });
+  const backSlots = randomDistinctSlots(width, backList.length);
+  backList.forEach((inst,i)=>{ enemy.back[backSlots[i]] = inst; });
 }
 
 function emptySide(width){
@@ -2203,8 +2267,7 @@ function startBattle(mobKey, opts){
   const enemyInstances = (mobKey !== null && mobKey !== undefined) ? makeEnemyInstances(mobKey) : [];
   const width = computeFieldWidth(player.units.length, enemyInstances.length);
   const enemy = emptySide(width);
-  const start = centeredStart(width, enemyInstances.length);
-  enemyInstances.forEach((inst,i)=>{ enemy.front[start+i] = inst; });
+  placeEnemies(enemy, width, enemyInstances);
   battle = {
     player: emptySide(width),
     enemy: enemy,
@@ -2260,11 +2323,31 @@ function resetMoveFlags(){
   for (const u of battle.player.back) if (u) u.movedThisTurn = false;
 }
 
+// Battle-start scaling abilities (e.g. Боб: +HP per other same-type ally deployed) — resolved once, right
+// before the fight begins, off the final deployed roster.
+function applyBattleStartAbilities(side){
+  const all = [...side.front, ...side.back].filter(Boolean);
+  for (const u of all){
+    for (const ab of u.abilities){
+      if (ab.type === "scale_hp_per_ally"){
+        const allyCount = all.filter(o=>o!==u && o.unitId===ab.unitId && !o.dead).length;
+        const bonus = allyCount * (ab.amount||1);
+        if (bonus>0){
+          u.maxHp += bonus;
+          u.hp += bonus;
+          u._scaleHpBonus = (u._scaleHpBonus||0) + bonus;
+        }
+      }
+    }
+  }
+}
+
 function beginRounds(){
   if (battle.phase !== "setup") return false;
   if (aliveList(battle.player.front).length===0 && aliveList(battle.player.back).length===0) return false;
   battle.phase = "playerTurn";
   resetMoveFlags();
+  applyBattleStartAbilities(battle.player);
   logMsg("Битва начинается!");
   return true;
 }
@@ -2321,11 +2404,11 @@ function effectiveShld(unit, lineName, rowArr, idx){
 }
 
 // ---- targeting ----
-// Front-row attackers may only target the enemy FRONT-row unit directly opposite, or one column left/right
-// (up to 3 candidates). Back-row (ranged-only) attackers target their own column, front or back, on the enemy
-// side (2 candidates, default front). NOTE: by design front-row units never reach an enemy's back row even if
-// the enemy's front is wiped out in that column range — that's an intentional v1 simplification, worth revisiting
-// if a future encounter ever puts enemies exclusively in the back row.
+// Front-row attackers target the enemy FRONT-row unit directly opposite, or one column left/right (up to
+// 3 candidates) — EXCEPT for the directly-opposite column specifically: if that front slot is empty/dead
+// (unblocked), the attack reaches the back-row unit in that same column instead (Round 14). Back-row
+// (ranged-only) attackers target their own column, front or back, on the enemy side (2 candidates, default
+// front, exact column match — no ±1 tolerance).
 function validTargetsFor(ownLine, ownIdx, enemySide, width){
   const candidates = [];
   if (ownLine === "front"){
@@ -2333,7 +2416,14 @@ function validTargetsFor(ownLine, ownIdx, enemySide, width){
       const idx = ownIdx + d;
       if (idx>=0 && idx<width){
         const u = enemySide.front[idx];
-        if (u && !u.dead) candidates.push({line:"front", idx});
+        if (u && !u.dead){
+          candidates.push({line:"front", idx});
+        } else if (d===0){
+          // Directly opposite column only (not diagonal): if the front slot there is empty/dead, the shot
+          // isn't blocked and can reach whatever's sitting in the back of that same column instead.
+          const b = enemySide.back[idx];
+          if (b && !b.dead) candidates.push({line:"back", idx});
+        }
       }
     }
   } else {
@@ -2535,21 +2625,20 @@ function resolvePlayerAttack(){
 // left/right — either to flee a strong attacker currently locked onto them, or to reach a weaker player
 // unit that's only reachable from the neighboring column. Kept deliberately simple (no lookahead beyond
 // one step, no enemy-on-enemy swapping).
-function repositionEnemiesAtTurnStart(){
-  const width = battle.width;
-  const arr = battle.enemy.front;
-  for (let idx=0; idx<arr.length; idx++){
-    const u = arr[idx];
+function repositionSideAtTurnStart(lineArr, lineName, width, defenderSide){
+  for (let idx=0; idx<lineArr.length; idx++){
+    const u = lineArr[idx];
     if (!u || u.dead) continue;
-    if (Math.random() > 0.35) continue;
-    const candidates = [idx-1, idx+1].filter(i=> i>=0 && i<width && !arr[i]);
+    const chance = u.moveChance != null ? u.moveChance : 35;
+    if (Math.random()*100 > chance) continue;
+    const candidates = [idx-1, idx+1].filter(i=> i>=0 && i<width && !lineArr[i]);
     if (!candidates.length) continue;
 
     function weakestTargetHp(atIdx){
-      const targets = validTargetsFor("front", atIdx, battle.player, width);
+      const targets = validTargetsFor(lineName, atIdx, defenderSide, width);
       let min = null;
       for (const t of targets){
-        const tArr = t.line==="front" ? battle.player.front : battle.player.back;
+        const tArr = t.line==="front" ? defenderSide.front : defenderSide.back;
         const tu = tArr[t.idx];
         if (tu && !tu.dead && (min===null || tu.hp < min)) min = tu.hp;
       }
@@ -2557,26 +2646,30 @@ function repositionEnemiesAtTurnStart(){
     }
     const curWeakest = weakestTargetHp(idx);
 
-    const attackers = [];
-    for (const pl of ["front","back"]){
-      battle.player[pl].forEach(pu=>{ if (pu && !pu.dead && pu.targetLine==="front" && pu.targetIdx===idx) attackers.push(pu); });
-    }
-    const underThreat = attackers.some(a => a.dmg >= u.hp * 0.5);
-
+    // Prefer a column that reaches a strictly weaker target than the current one; otherwise the roll
+    // already decided this unit moves this turn (that's what moveChance means), so fall back to a random
+    // open candidate rather than staying put — a 100%-moveChance unit should reliably move every turn it can.
     let bestIdx = null, bestWeakest = curWeakest;
     for (const cIdx of candidates){
       const w = weakestTargetHp(cIdx);
       if (w!==null && (bestWeakest===null || w < bestWeakest)){ bestWeakest = w; bestIdx = cIdx; }
     }
-    if (bestIdx===null && underThreat){
+    if (bestIdx===null){
       bestIdx = candidates[Math.floor(Math.random()*candidates.length)];
     }
-    if (bestIdx!==null){
-      arr[bestIdx] = u;
-      arr[idx] = null;
-      u.targetLine = null; u.targetIdx = null; // column changed — re-default on next resolution
-    }
+    lineArr[bestIdx] = u;
+    lineArr[idx] = null;
+    u.targetLine = null; u.targetIdx = null; // column changed — re-default on next resolution
   }
+}
+
+function repositionEnemiesAtTurnStart(){
+  const width = battle.width;
+  repositionSideAtTurnStart(battle.enemy.front, "front", width, battle.player);
+  // Back-row (ranged) enemies deliberately do NOT reposition: back-row targeting is a strict single-column
+  // match (no ±1 tolerance like the front row), so a shuffling backline unit could dodge the player's own
+  // ranged retaliation almost every other turn — a "sniper vs sniper" fight would become uncounterable.
+  // Holding position also fits the flavor (a sniper/turret archetype that doesn't relocate mid-fight).
 }
 
 function resolveEnemyAttack(){
@@ -2607,6 +2700,7 @@ function endBattle(victory, stalemate){
   for (const row of [battle.player.front, battle.player.back]){
     for (const u of row){
       if (u && !u.dead){
+        if (u._scaleHpBonus){ u.maxHp -= u._scaleHpBonus; u.hp = Math.min(u.hp, u.maxHp); u._scaleHpBonus = 0; }
         for (const ab of u.abilities){
           if (ab.type==="post_battle_full_heal") u.hp = u.maxHp;
           if (ab.type==="post_battle_heal_adjacent") u.hp = Math.min(u.maxHp, u.hp+ab.amount);
@@ -2836,9 +2930,9 @@ function applySpinResult(result){
 function startCasinoFight(){
   const width = computeFieldWidth(player.units.length, 1);
   const enemy = emptySide(width);
-  enemy.front[centeredStart(width,1)] = { uid: nextUid(), unitId:"casino_enemy", name: CASINO_ENEMY.name,
+  placeEnemies(enemy, width, [{ uid: nextUid(), unitId:"casino_enemy", name: CASINO_ENEMY.name,
     hp: CASINO_ENEMY.hp, maxHp: CASINO_ENEMY.hp, dmg: CASINO_ENEMY.dmg, shld: CASINO_ENEMY.shld,
-    abilities: [], turnCounter:0, dead:false };
+    abilities: [], moveChance: 15, backline:false, turnCounter:0, dead:false }]);
   battle = {
     player: emptySide(width), enemy, round:1, log:[], phase:"setup",
     playerDestroyedCount:0, sumDmgTaken:0, result:null, mobKey:null, isCasinoFight:true, width:width
@@ -2851,11 +2945,12 @@ function startConscriptionFight(){
   const count = 2 + Math.floor(Math.random()*2); // 2-3
   const width = computeFieldWidth(player.units.length, count);
   const enemy = emptySide(width);
-  const start = centeredStart(width, count);
+  const instances = [];
   for (let i=0;i<count;i++){
-    enemy.front[start+i] = { uid: nextUid(), unitId:"busik", name:"Бусик *", hp:9, maxHp:9, dmg:2, shld:0,
-      abilities: [], turnCounter:0, dead:false };
+    instances.push({ uid: nextUid(), unitId:"busik", name:"Бусик *", hp:9, maxHp:9, dmg:2, shld:0,
+      abilities: [], moveChance: 60, backline:false, turnCounter:0, dead:false });
   }
+  placeEnemies(enemy, width, instances);
   battle = {
     player: emptySide(width), enemy, round:1, log:[], phase:"setup",
     playerDestroyedCount:0, sumDmgTaken:0, result:null, mobKey:null, isConscriptionFight:true, width:width
@@ -2987,11 +3082,10 @@ function closeSewerEvent(){
 function startEventFight(enemyDefs){
   const width = computeFieldWidth(player.units.length, enemyDefs.length);
   const enemy = emptySide(width);
-  const start = centeredStart(width, enemyDefs.length);
-  enemyDefs.forEach((d,i)=>{
-    enemy.front[start+i] = { uid: nextUid(), unitId:"sewer_event_enemy", name:d.name,
-      hp:d.hp, maxHp:d.hp, dmg:d.dmg, shld:d.shld||0, abilities:[], turnCounter:0, dead:false };
-  });
+  const instances = enemyDefs.map(d=>({ uid: nextUid(), unitId:"sewer_event_enemy", name:d.name,
+    hp:d.hp, maxHp:d.hp, dmg:d.dmg, shld:d.shld||0, abilities: d.abilities||[],
+    moveChance: d.moveChance != null ? d.moveChance : 35, backline: !!d.backline, turnCounter:0, dead:false }));
+  placeEnemies(enemy, width, instances);
   battle = {
     player: emptySide(width), enemy, round:1, log:[], phase:"setup",
     playerDestroyedCount:0, sumDmgTaken:0, result:null, mobKey:null, isSewerEvent:true, width:width
@@ -3542,7 +3636,11 @@ function renderSewerEvent(){
 }
 
 // Auto-arrange for setup: tanky (high HP+shield) melee units go front, ranged and squishier units go
-// back. Deliberately simple — no lookahead on the specific enemy composition, just a sane default.
+// back. Anchored on the enemy's actual (now randomized) column spread rather than the raw field center —
+// otherwise a scattered enemy would leave half the auto-arranged army stuck out of column range. Ranged
+// player units specifically try to match the enemy's own backline columns first: back-row targeting is an
+// exact single-column match (no ±1 tolerance like the front row), so a ranged unit that doesn't line up
+// with an enemy backline unit's column can never hit it at all.
 function autoArrangeUnits(){
   if (!battle || battle.phase !== "setup") return;
   for (const line of [battle.player.front, battle.player.back]){
@@ -3556,12 +3654,44 @@ function autoArrangeUnits(){
   const melee = pool.filter(u=>!ranged.includes(u));
   const tankScore = u => u.hp + (u.shld||0)*3;
   melee.sort((a,b)=> tankScore(b)-tankScore(a));
+
+  const enemyFrontCols = [];
+  battle.enemy.front.forEach((u,i)=>{ if (u) enemyFrontCols.push(i); });
+  const enemyBackCols = [];
+  battle.enemy.back.forEach((u,i)=>{ if (u) enemyBackCols.push(i); });
+  const enemyCols = enemyFrontCols.concat(enemyBackCols);
+  const anchor = enemyCols.length
+    ? Math.round(enemyCols.reduce((a,b)=>a+b,0) / enemyCols.length)
+    : Math.floor((width-1)/2);
+  function anchoredStart(count, anchorPoint){
+    return Math.max(0, Math.min(width-count, anchorPoint - Math.floor(count/2)));
+  }
+
   const frontPicks = melee.slice(0, width);
-  const backPicks = [...ranged, ...melee.slice(width)].slice(0, width);
-  const frontStart = centeredStart(width, frontPicks.length);
+  const frontStart = anchoredStart(frontPicks.length, anchor);
   frontPicks.forEach((u,i)=> deployUnit(u.uid, "front", frontStart+i));
-  const backStart = centeredStart(width, backPicks.length);
-  backPicks.forEach((u,i)=> deployUnit(u.uid, "back", backStart+i));
+
+  const backPicks = [...ranged, ...melee.slice(width)].slice(0, width);
+  const usedCols = new Set();
+  const leftover = [];
+  backPicks.forEach((u,i)=>{
+    const col = enemyBackCols[i];
+    if (col !== undefined && !usedCols.has(col)){
+      deployUnit(u.uid, "back", col);
+      usedCols.add(col);
+    } else {
+      leftover.push(u);
+    }
+  });
+  if (leftover.length){
+    let slot = anchoredStart(leftover.length, anchor);
+    for (const u of leftover){
+      while (slot < width && battle.player.back[slot]) slot++;
+      if (slot >= width) break;
+      deployUnit(u.uid, "back", slot);
+      slot++;
+    }
+  }
 }
 
 function renderBattleSetup(){
@@ -3902,7 +4032,10 @@ function confirmFleeSetup(){
 function resolveFleeBattle(penaltyType){
   for (const row of [battle.player.front, battle.player.back]){
     for (const u of row){
-      if (u && !u.dead) player.units.push(u);
+      if (u && !u.dead){
+        if (u._scaleHpBonus){ u.maxHp -= u._scaleHpBonus; u.hp = Math.min(u.hp, u.maxHp); u._scaleHpBonus = 0; }
+        player.units.push(u);
+      }
     }
   }
   let msg = "";
@@ -4724,8 +4857,24 @@ async function loadGame(){
   } catch(e){ return false; }
 }
 
+// Wipes ALL browser storage tied to this page (not just our save key) and hard-reloads — a blunter tool
+// than "Обнулить прогресс" for when something in the browser itself seems stuck or corrupted, not just
+// the in-game state.
+async function clearCacheAndReload(){
+  try { if (window.storage) await window.storage.delete(SAVE_KEY, false); } catch(e){}
+  try { window.localStorage.clear(); } catch(e){}
+  try {
+    if (window.caches && caches.keys){
+      const names = await caches.keys();
+      await Promise.all(names.map(n=>caches.delete(n)));
+    }
+  } catch(e){}
+  location.reload();
+}
+
 // ===================== RENDER: SETTINGS =====================
 var settingsConfirmingReset = false;
+var settingsConfirmingClearCache = false;
 
 function renderSettings(){
   document.getElementById("view").innerHTML = `
@@ -4752,6 +4901,17 @@ function renderSettings(){
         : `<button class="btn btn-ghost" id="reset-progress-btn">Обнулить прогресс</button>`
       }
     </section>
+    <section class="panel">
+      <h2>Очистка кэша сайта</h2>
+      <p class="muted small">Стирает вообще всё, что браузер хранит для этой страницы (не только игровой прогресс), и перезагружает её. Полезно, если что-то зависло или ведёт себя странно.</p>
+      ${settingsConfirmingClearCache
+        ? `<div class="settings-row">
+             <button class="btn btn-danger" id="confirm-clear-cache-btn">Да, стереть кэш и перезагрузить</button>
+             <button class="btn" id="cancel-clear-cache-btn">Отмена</button>
+           </div>`
+        : `<button class="btn btn-ghost" id="clear-cache-btn">Стереть кэш и перезагрузить</button>`
+      }
+    </section>
   `;
   const toggleBtn = document.getElementById("toggle-mimics-btn");
   if (toggleBtn) toggleBtn.addEventListener("click", ()=>{
@@ -4772,6 +4932,20 @@ function renderSettings(){
   const cancelBtn = document.getElementById("cancel-reset-btn");
   if (cancelBtn) cancelBtn.addEventListener("click", ()=>{
     settingsConfirmingReset = false;
+    renderAll();
+  });
+  const clearCacheBtn = document.getElementById("clear-cache-btn");
+  if (clearCacheBtn) clearCacheBtn.addEventListener("click", ()=>{
+    settingsConfirmingClearCache = true;
+    renderAll();
+  });
+  const confirmClearCacheBtn = document.getElementById("confirm-clear-cache-btn");
+  if (confirmClearCacheBtn) confirmClearCacheBtn.addEventListener("click", ()=>{
+    clearCacheAndReload();
+  });
+  const cancelClearCacheBtn = document.getElementById("cancel-clear-cache-btn");
+  if (cancelClearCacheBtn) cancelClearCacheBtn.addEventListener("click", ()=>{
+    settingsConfirmingClearCache = false;
     renderAll();
   });
 }
