@@ -191,7 +191,14 @@ const EXTRA_ITEMS = [
   {id:"portal_key", name:"Портальный ключ *", tags:"P", rarity:"precious", desc:"Открывает проход в Туманные земли. Использовать осторожно — туман не любит, когда его тревожат зря."},
   {id:"foglichen", name:"Туманный лишайник *", tags:"X", rarity:"normal", desc:"Растёт только там, где обычная логика не работает."},
   {id:"witchvial", name:"Флакон Лесной Ведьмы *", tags:"S", rarity:"rare", desc:"Внутри — что-то булькающее. Ведьма забыла подписать содержимое."},
-  {id:"ancientantler", name:"Древний рог *", tags:"S", rarity:"precious", desc:"Отвалился от кого-то очень старого и очень недовольного этим фактом."}
+  {id:"ancientantler", name:"Древний рог *", tags:"S", rarity:"precious", desc:"Отвалился от кого-то очень старого и очень недовольного этим фактом."},
+  // ---- Round 15: equippable weapons — one slot per (non-robot) unit, applied via Инвентарь ----
+  {id:"nailstick", name:"Ржавый гвоздь на палке *", tags:"Y", rarity:"trash", isWeapon:true, weaponEffect:{dmgDelta:1}, desc:"Оружие отчаяния. Работает — с натяжкой."},
+  {id:"spoonshank", name:"Заточка из ложки *", tags:"Y", rarity:"suchself", isWeapon:true, weaponEffect:{dmgDelta:2}, desc:"Кто-то потратил на это целую ночь в очереди."},
+  {id:"pitchfork", name:"Вилы огородные *", tags:"Y", rarity:"normal", isWeapon:true, weaponEffect:{dmgDelta:3}, desc:"Прямиком с грядки, минуя стадию «мирного инвентаря»."},
+  {id:"fatewrench", name:"Разводной ключ судьбы *", tags:"Y", rarity:"rare", isWeapon:true, weaponEffect:{dmgDelta:3, shldDelta:1}, desc:"Разводит не только гайки, но и обстоятельства."},
+  {id:"cleaver", name:"Мясницкий тесак *", tags:"Y", rarity:"rare", isWeapon:true, weaponEffect:{dmgDelta:4, grantAbility:{type:"armor_pierce", amount:1}}, desc:"Проходит сквозь щит примерно так же легко, как сквозь всё остальное."},
+  {id:"goldpoker", name:"Позолоченная кочерга *", tags:"Y", rarity:"precious", isWeapon:true, weaponEffect:{dmgDelta:5, shldDelta:1}, desc:"Слишком благородная для камина. Слишком острая, чтобы это признать."}
 ];
 for (const it of EXTRA_ITEMS) ITEM_DB[it.id] = it;
 
@@ -349,16 +356,25 @@ const RECIPES = [
   {id:"r_rabbit_foot", inputs:[{id:"roach",qty:1},{id:"grass",qty:1}], tools:[], output:{item:"rabbit_foot", qty:1}, label:"Таракан + Трава = Заячья лапка * (технически не заяц)", homebrew:true},
 
   // ---- Farlands unlock ----
-  {id:"r_portal_key", inputs:[{id:"portal_shard",qty:2},{id:"madnessjar",qty:1}], tools:[], output:{item:"portal_key", qty:1}, label:"Осколок портала * ×2 + Безумие в банке = Портальный ключ * (открывает Туманные земли)", homebrew:true}
+  {id:"r_portal_key", inputs:[{id:"portal_shard",qty:2},{id:"madnessjar",qty:1}], tools:[], output:{item:"portal_key", qty:1}, label:"Осколок портала * ×2 + Безумие в банке = Портальный ключ * (открывает Туманные земли)", homebrew:true},
+
+  // ---- Round 15: equippable weapons ----
+  {id:"r_nailstick", inputs:[{id:"nail",qty:1},{id:"stick",qty:1}], tools:[], output:{item:"nailstick", qty:1}, label:"Гвоздь + Палка = Ржавый гвоздь на палке * (оружие)", homebrew:true},
+  {id:"r_spoonshank", inputs:[{id:"nail",qty:1},{id:"cloth",qty:1}], tools:[], output:{item:"spoonshank", qty:1}, label:"Гвоздь + Ткань = Заточка из ложки * (оружие)", homebrew:true},
+  {id:"r_pitchfork", inputs:[{id:"stick",qty:2},{id:"brick",qty:1}], tools:[], output:{item:"pitchfork", qty:1}, label:"Палка ×2 + Кирпич = Вилы огородные * (оружие)", homebrew:true},
+  {id:"r_fatewrench", inputs:[{id:"wires",qty:1},{id:"brick",qty:1},{id:"grime",qty:1}], tools:[], output:{item:"fatewrench", qty:1}, label:"Провода + Кирпич + Чернь = Разводной ключ судьбы * (оружие)", homebrew:true},
+  {id:"r_cleaver", inputs:[{id:"brick",qty:1},{id:"nail",qty:1},{id:"sandchunk",qty:1}], tools:[], output:{item:"cleaver", qty:1}, label:"Кирпич + Гвоздь + КУСОК ПЕСКА = Мясницкий тесак * (оружие, пробивает щит)", homebrew:true},
+  {id:"r_goldpoker", inputs:[{id:"barrelitem",qty:1},{id:"wires",qty:1},{id:"brick",qty:1}], tools:[], output:{item:"goldpoker", qty:1}, label:"Бочка + Провода + Кирпич = Позолоченная кочерга * (оружие)", homebrew:true}
 ];
 
 function recipeCategory(recipe){
   if (recipe.output.unit) return "unit";
   const item = ITEM_DB[recipe.output.item];
+  if (item && item.isWeapon) return "weapon";
   if (item && item.tags && item.tags.indexOf("Y") !== -1) return "buff";
   return "component";
 }
-const RECIPE_CATEGORY_LABEL = { unit:"Юниты", buff:"Баффы юнитам", component:"Компоненты и предметы" };
+const RECIPE_CATEGORY_LABEL = { unit:"Юниты", weapon:"Оружие", buff:"Баффы юнитам", component:"Компоненты и предметы" };
 
 function recipeDisplayParts(recipe){
   const parts = [];
@@ -2744,6 +2760,43 @@ function findRosterOrDeployedUnit(uid){
 
 // Returns {ok:boolean, msg:string}. Feed-transforms only work on roster units;
 // generic stat/heal effects also work on deployed units mid-battle if the item is battleUsable.
+function applyWeaponEffect(unit, eff){
+  if (!eff) return;
+  if (eff.dmgDelta) unit.dmg = Math.max(0, unit.dmg + eff.dmgDelta);
+  if (eff.shldDelta) unit.shld = Math.max(0, (unit.shld||0) + eff.shldDelta);
+  if (eff.grantAbility){
+    unit.abilities = unit.abilities || [];
+    unit.abilities.push({...eff.grantAbility, _fromWeapon:true});
+  }
+}
+function revertWeaponEffect(unit, eff){
+  if (!eff) return;
+  if (eff.dmgDelta) unit.dmg = Math.max(0, unit.dmg - eff.dmgDelta);
+  if (eff.shldDelta) unit.shld = Math.max(0, (unit.shld||0) - eff.shldDelta);
+  if (eff.grantAbility){
+    const idx = unit.abilities.findIndex(a=>a._fromWeapon && a.type===eff.grantAbility.type);
+    if (idx>=0) unit.abilities.splice(idx,1);
+  }
+}
+// Returns the currently-equipped weapon (if any) to the inventory and reverts its stat effect. Internal —
+// callers decide whether this is a swap (immediately followed by equipping a new weapon) or a plain unequip.
+function unequipWeaponInternal(unit){
+  const itemId = unit.equippedWeapon;
+  if (!itemId) return;
+  const item = ITEM_DB[itemId];
+  if (item && item.weaponEffect) revertWeaponEffect(unit, item.weaponEffect);
+  addItem(itemId, 1);
+  unit.equippedWeapon = null;
+}
+// Explicit unequip from the Inventory tab's "Снять оружие" button.
+function unequipWeapon(uid){
+  const unit = player.units.find(u=>u.uid===uid);
+  if (!unit || !unit.equippedWeapon) return {ok:false};
+  const name = itemName(unit.equippedWeapon);
+  unequipWeaponInternal(unit);
+  return {ok:true, name};
+}
+
 function useItemOnUnit(uid, itemId){
   const found = findRosterOrDeployedUnit(uid);
   const unit = found.unit;
@@ -2760,6 +2813,20 @@ function useItemOnUnit(uid, itemId){
       if (into) player.units[idx] = into;
       return {ok:true, msg:unit.name+" съедает "+itemName(itemId)+" и превращается в "+ (into?into.name:"нечто новое") + "!", transformed:true};
     }
+  }
+
+  // 1.5) equippable weapon (regular units only — robots build their weapon into their 3-part assembly instead)
+  const weaponItem = ITEM_DB[itemId];
+  if (weaponItem && weaponItem.isWeapon){
+    if (unit.isRobot) return {ok:false, msg:"Роботам нужно собирать оружие через Мастерскую роботов, а не экипировать напрямую."};
+    if (!found.inRoster) return {ok:false, msg:"Оружие можно экипировать только вне боя."};
+    if (unit.equippedWeapon){
+      unequipWeaponInternal(unit); // swap: return the old weapon to inventory first
+    }
+    removeItem(itemId, 1);
+    unit.equippedWeapon = itemId;
+    applyWeaponEffect(unit, weaponItem.weaponEffect);
+    return {ok:true, msg:unit.name+" экипирует "+itemName(itemId)+"."};
   }
 
   // 2) generic stat/heal buff item (organic buffs, robot weapons via robotOnly, battle items via battleUsable)
@@ -3169,6 +3236,9 @@ function unitTooltip(u){
   if (u.isRobot && u.parts){
     html += "<div class='tt-parts'>Прошивка: "+u.parts.firmware+"<br>Корпус: "+u.parts.chassis+"<br>Передвижение: "+u.parts.movement+"</div>";
   }
+  if (u.equippedWeapon){
+    html += "<div class='tt-parts'>Оружие: "+itemName(u.equippedWeapon)+"</div>";
+  }
   if (abilities.length) html += "<div class='tt-abilities'>"+abilities.map(a=>"• "+a).join("<br>")+"</div>";
   return html;
 }
@@ -3214,6 +3284,13 @@ function itemTooltip(itemId){
     const label = eff.robotOnly ? "Экипировка (только роботам)" : "Применение к юниту";
     if (eparts.length) html += "<div class='tt-stats'>"+label+": "+eparts.join(" &nbsp; ")+"</div>";
     if (eff.grantAbility) html += "<div class='tt-abilities'>• "+abilityText(eff.grantAbility)+"</div>";
+  }
+  if (it.isWeapon && it.weaponEffect){
+    const wparts = [];
+    if (it.weaponEffect.dmgDelta) wparts.push("DMG +"+it.weaponEffect.dmgDelta);
+    if (it.weaponEffect.shldDelta) wparts.push("SHLD +"+it.weaponEffect.shldDelta);
+    html += "<div class='tt-stats'>Оружие (1 слот на юнита): "+wparts.join(" &nbsp; ")+"</div>";
+    if (it.weaponEffect.grantAbility) html += "<div class='tt-abilities'>• "+abilityText(it.weaponEffect.grantAbility)+"</div>";
   }
   if (it.desc) html += "<div class='tt-abilities'>"+it.desc+"</div>";
   return html;
@@ -3349,6 +3426,8 @@ function renderTopbar(){
 function isItemUsableOnUnit(unit, itemId){
   if (!unit) return false;
   if (unit.abilities.some(a=>a.type==="feed_transform" && a.item===itemId)) return true;
+  const item = ITEM_DB[itemId];
+  if (item && item.isWeapon && !unit.isRobot) return true;
   const eff = ITEM_EFFECTS[itemId];
   if (eff && (!eff.robotOnly || unit.isRobot)) return true;
   return false;
@@ -3363,6 +3442,9 @@ function renderInventory(){
        ${isBroke ? `<button class="btn btn-ghost" id="call-steyn-bailout-btn">☎ Попросить у Штейна денежный бейлаут</button>` : ""}`;
 
   const selectedUnit = invSelectedUid ? player.units.find(u=>u.uid===invSelectedUid) : null;
+  const unequipBtnHtml = (selectedUnit && selectedUnit.equippedWeapon)
+    ? `<button class="btn btn-ghost" id="unequip-weapon-btn">Снять оружие (${itemName(selectedUnit.equippedWeapon)})</button>`
+    : "";
 
   let itemsHtml = "";
   for (const rarity of RARITY_ORDER){
@@ -3385,6 +3467,7 @@ function renderInventory(){
     <section class="panel">
       <h2>Отряд <span class="count-badge">${player.units.length}</span></h2>
       <div class="roster-grid">${rosterHtml}</div>
+      ${unequipBtnHtml}
       ${hint}
       ${invMessage ? `<p class="inv-message">${invMessage}</p>` : ""}
     </section>
@@ -3420,6 +3503,15 @@ function renderInventory(){
         ? res.taken.map(t=>itemName(t.id)+" ×"+t.qty).join(", ")
         : "(взять было особо нечего)";
       invMessage = `Штейн долго ругается — «совсем стыд потерял, ни армии, ни Ио» — забирает: ${takenList}. Взамен кидает ${res.bailout} Ио «в последний раз».`;
+      renderAll();
+    });
+  }
+  const unequipBtn = document.getElementById("unequip-weapon-btn");
+  if (unequipBtn){
+    unequipBtn.addEventListener("click", ()=>{
+      const res = unequipWeapon(invSelectedUid);
+      invMessage = res.ok ? `Оружие (${res.name}) снято и возвращено в инвентарь.` : "Не удалось снять оружие.";
+      invSelectedUid = null;
       renderAll();
     });
   }
@@ -3537,7 +3629,7 @@ function recipeCardHtml(r){
 
 // ===================== RENDER: CRAFT =====================
 function renderCraft(){
-  const categories = ["unit","buff","component"];
+  const categories = ["unit","weapon","buff","component"];
   let html = "";
   for (const cat of categories){
     const recipes = RECIPES.filter(r=>recipeCategory(r)===cat);
